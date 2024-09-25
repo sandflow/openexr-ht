@@ -55,6 +55,7 @@ add_executable(OpenEXRTest
   testFutureProofing.h
   testHeader.cpp
   testHeader.h
+  testHTCompression.cpp
   testHuf.cpp
   testHuf.h
   testIDManifest.cpp
@@ -169,6 +170,7 @@ define_openexr_tests(
  testExistingStreams
  testFutureProofing
  testHeader
+ testHTCompression
  testHuf
  testInputPart
  testIsComplete
