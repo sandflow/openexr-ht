@@ -74,9 +74,7 @@ internal_exr_undo_ht (
 
             for (uint32_t p = 0; p < width; p++)
             {
-                ojph::si32 c = cur_line->i32[p];
-
-                *channel_pixels++ = (int16_t) (c < 0 ? -32769 - c : c);
+                *channel_pixels++ = (int16_t) (cur_line->i32[p]);
             }
         }
 
@@ -122,6 +120,9 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
     cod.set_block_dims (128, 32);
     cod.set_num_decomposition (5);
 
+    ojph::param_nlt nlt = cs.access_nlt();
+    nlt.set_type3_transformation(65535, true);
+
     ojph::mem_outfile output;
 
     output.open ();
@@ -149,10 +150,7 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
 
             for (uint32_t p = 0; p < width; p++)
             {
-                ojph::si32 c =
-                    static_cast<const ojph::si32> (*channel_pixels++);
-
-                cur_line->i32[p] = c < 0 ? -32769 - c : c;
+                cur_line->i32[p] = static_cast<const ojph::si32> (*channel_pixels++);
             }
 
             cur_line = cs.exchange (cur_line, next_comp);
