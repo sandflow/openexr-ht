@@ -36,7 +36,7 @@ HTCompressor::HTCompressor (
     const Header& hdr, size_t maxScanLineSize, int numScanLines)
     : Compressor (
           hdr,
-          EXR_COMPRESSION_HT,
+          EXR_COMPRESSION_LAST_TYPE,
           maxScanLineSize,
           numScanLines > 0 ? numScanLines : 16000)
 {}
