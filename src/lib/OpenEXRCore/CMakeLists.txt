@@ -45,6 +45,7 @@ openexr_define_library(OpenEXRCore
     internal_piz.c
     internal_ht.cpp
     internal_htk.cpp
+    internal_ht_common.cpp
     internal_dwa.c
     internal_huf.c
 
