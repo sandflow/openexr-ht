@@ -21,49 +21,25 @@
 
 #include "openexr_compression.h"
 
-exr_result_t
-internal_exr_undo_ht (
-    exr_decode_pipeline_t* decode,
-    const void*            compressed_data,
-    uint64_t               comp_buf_size,
-    void*                  uncompressed_data,
-    uint64_t               uncompressed_size)
+int
+make_channel_map (
+    int channel_count, exr_coding_channel_info_t* channels, int cs_to_file_ch[])
 {
-    exr_result_t rv;
-
-    return rv;
-}
-
-exr_result_t
-internal_exr_apply_ht (exr_encode_pipeline_t* encode)
-{
-    exr_result_t rv;
-
-    /* generate channel map */
-
     int r_index = -1;
     int g_index = -1;
     int b_index = -1;
 
-    /* FIX ME */
-    assert (encode->channel_count <= 6);
-    int cs_to_file_ch[6];
-
-    int16_t c_count = 0;
-
-    for (size_t i = 0; i < encode->channel_count; i++)
+    for (size_t i = 0; i < channel_count; i++)
     {
-        assert (encode->channels[i].data_type == EXR_PIXEL_HALF);
-        assert (encode->channels[i].x_samples == 1);
-        assert (encode->channels[i].y_samples == 1);
+        assert (channels[i].data_type == EXR_PIXEL_HALF);
+        assert (channels[i].x_samples == 1);
+        assert (channels[i].y_samples == 1);
 
-        char c_name = encode->channels[i].channel_name[0];
+        char c_name = channels[i].channel_name[0];
 
-        if (c_name == 'R') { r_index = c_count; }
-        else if (c_name == 'G') { g_index = c_count; }
-        else if (c_name == 'B') { b_index = c_count; }
-
-        c_count++;
+        if (c_name == 'R') { r_index = i; }
+        else if (c_name == 'G') { g_index = i; }
+        else if (c_name == 'B') { b_index = i; }
     }
 
     int isRGB;
@@ -76,26 +52,105 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
         cs_to_file_ch[1] = g_index;
         cs_to_file_ch[2] = b_index;
 
-        int file_i = 0;
-        int cs_i   = 3;
-        for (size_t i = 0; i < encode->channel_count; i++)
+        int cs_i = 3;
+        for (size_t i = 0; i < channel_count; i++)
         {
-            if (file_i != r_index && file_i != g_index && file_i != b_index)
+            if (i != r_index && i != g_index && i != b_index)
             {
-                cs_to_file_ch[cs_i++] = file_i;
+                cs_to_file_ch[cs_i++] = i;
             }
-            file_i++;
         }
     }
     else
     {
         isRGB = 0;
 
-        for (size_t i = 0; i < encode->channel_count; i++)
+        for (size_t i = 0; i < channel_count; i++)
         {
             cs_to_file_ch[i] = i;
         }
     }
+
+    return isRGB;
+}
+
+extern "C" exr_result_t
+internal_exr_undo_ht (
+    exr_decode_pipeline_t* decode,
+    const void*            compressed_data,
+    uint64_t               comp_buf_size,
+    void*                  uncompressed_data,
+    uint64_t               uncompressed_size)
+{
+    exr_result_t rv = EXR_ERR_SUCCESS;
+
+    assert (decode->channel_count <= 6);
+    int cs_to_file_ch[6];
+    int isRGB = make_channel_map (
+        decode->channel_count, decode->channels, cs_to_file_ch);
+
+    ojph::mem_infile infile;
+    infile.open (
+        reinterpret_cast<const ojph::ui8*> (compressed_data), comp_buf_size);
+
+    ojph::codestream cs;
+    cs.read_headers (&infile);
+
+    ojph::param_siz siz = cs.access_siz ();
+    ojph::ui32 width    = siz.get_image_extent ().x - siz.get_image_offset ().x;
+    ojph::ui32 height   = siz.get_image_extent ().y - siz.get_image_offset ().y;
+
+    assert (decode->chunk.width == width);
+    assert (decode->chunk.height == height);
+    assert (decode->channel_count == siz.get_num_components ());
+
+    assert (decode->channel_count * 2 * width * height == uncompressed_size);
+
+    cs.set_planar (false);
+
+    cs.create ();
+
+    assert (sizeof (int16_t) == 2);
+    int16_t* line_pixels = static_cast<int16_t*> (uncompressed_data);
+
+    for (uint32_t i = 0; i < height; ++i)
+    {
+
+        for (uint32_t c = 0; c < decode->channel_count; c++)
+        {
+            ojph::ui32      next_comp = 0;
+            ojph::line_buf* cur_line  = cs.pull (next_comp);
+
+            assert (next_comp == c);
+
+            int16_t* channel_pixels = line_pixels + width * cs_to_file_ch[c];
+
+            for (uint32_t p = 0; p < width; p++)
+            {
+                ojph::si32 c = cur_line->i32[p];
+
+                *channel_pixels++ = (int16_t) (c < 0 ? -32769 - c : c);
+            }
+        }
+
+        line_pixels += width * decode->channel_count;
+    }
+
+    infile.close ();
+
+    return rv;
+}
+
+extern "C"
+exr_result_t
+internal_exr_apply_ht (exr_encode_pipeline_t* encode)
+{
+    exr_result_t rv = EXR_ERR_SUCCESS;
+
+    assert (encode->channel_count <= 6);
+    int cs_to_file_ch[6];
+    int isRGB = make_channel_map (
+        encode->channel_count, encode->channels, cs_to_file_ch);
 
     int height = encode->channels[0].height;
     int width  = encode->channels[0].width;
@@ -105,8 +160,8 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
 
     ojph::param_siz siz = cs.access_siz ();
 
-    siz.set_num_components (c_count);
-    for (ojph::ui32 c = 0; c < c_count; c++)
+    siz.set_num_components (encode->channel_count);
+    for (ojph::ui32 c = 0; c < encode->channel_count; c++)
         siz.set_component (c, ojph::point (1, 1), 16, true);
 
     /* TODO: extend to multiple tiles and non-coincident data and display windows */
@@ -128,17 +183,19 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
 
     cs.write_headers (&output);
 
-    assert (encode->packed_bytes == (c_count * 2 * height * width));
+    assert (
+        encode->packed_bytes == (encode->channel_count * 2 * height * width));
 
-    const int16_t*  line_pixels = static_cast<const int16_t*>(encode->packed_sample_count_table);
-    ojph::ui32      next_comp   = 0;
-    ojph::line_buf* cur_line    = cs.exchange (NULL, next_comp);
+    const int16_t* line_pixels =
+        static_cast<const int16_t*> (encode->packed_sample_count_table);
+    ojph::ui32      next_comp = 0;
+    ojph::line_buf* cur_line  = cs.exchange (NULL, next_comp);
 
     for (ojph::ui32 i = 0; i < height; ++i)
     {
         const char* in_buf;
 
-        for (ojph::ui32 c = 0; c < c_count; c++)
+        for (ojph::ui32 c = 0; c < encode->channel_count; c++)
         {
             assert (next_comp == c);
 
@@ -156,7 +213,7 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
             cur_line = cs.exchange (cur_line, next_comp);
         }
 
-        line_pixels += width * c_count;
+        line_pixels += width * encode->channel_count;
     }
 
     cs.flush ();
@@ -168,7 +225,7 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
     if (compressed_sz < encode->packed_bytes)
     {
         memcpy (encode->compressed_buffer, output.get_data (), compressed_sz);
-        encode->compressed_bytes  = compressed_sz;
+        encode->compressed_bytes = compressed_sz;
     }
     else { encode->compressed_bytes = encode->packed_bytes; }
 
