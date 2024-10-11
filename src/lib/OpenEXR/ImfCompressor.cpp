@@ -339,7 +339,7 @@ newCompressor (Compression c, size_t maxScanLineSize, const Header& hdr)
 
         case HT_COMPRESSION:
 
-            return new HTCompressor (hdr, static_cast<int> (maxScanLineSize));
+            return new HTCompressor (hdr, static_cast<int> (maxScanLineSize), 0);
 
         case HT256_COMPRESSION:
 
