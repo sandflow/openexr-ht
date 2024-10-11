@@ -199,6 +199,7 @@ static const std::map<std::string, Compression> CompressionNameToId = {
     {"dwaa", Compression::DWAA_COMPRESSION},
     {"dwab", Compression::DWAB_COMPRESSION},
     {"ht", Compression::HT_COMPRESSION},
+    {"ht256", Compression::HT256_COMPRESSION},
 };
 
 #define UNKNOWN_COMPRESSION_ID_MSG "INVALID COMPRESSION ID"
