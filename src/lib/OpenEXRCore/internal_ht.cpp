@@ -20,59 +20,7 @@
 #include <ojph_codestream.h>
 
 #include "openexr_compression.h"
-
-int
-make_channel_map (
-    int channel_count, exr_coding_channel_info_t* channels, int cs_to_file_ch[])
-{
-    int r_index = -1;
-    int g_index = -1;
-    int b_index = -1;
-
-    for (size_t i = 0; i < channel_count; i++)
-    {
-        assert (channels[i].data_type == EXR_PIXEL_HALF);
-        assert (channels[i].x_samples == 1);
-        assert (channels[i].y_samples == 1);
-
-        char c_name = channels[i].channel_name[0];
-
-        if (c_name == 'R') { r_index = i; }
-        else if (c_name == 'G') { g_index = i; }
-        else if (c_name == 'B') { b_index = i; }
-    }
-
-    int isRGB;
-
-    if (r_index >= 0 && g_index >= 0 && b_index >= 0)
-    {
-        isRGB = 1;
-
-        cs_to_file_ch[0] = r_index;
-        cs_to_file_ch[1] = g_index;
-        cs_to_file_ch[2] = b_index;
-
-        int cs_i = 3;
-        for (size_t i = 0; i < channel_count; i++)
-        {
-            if (i != r_index && i != g_index && i != b_index)
-            {
-                cs_to_file_ch[cs_i++] = i;
-            }
-        }
-    }
-    else
-    {
-        isRGB = 0;
-
-        for (size_t i = 0; i < channel_count; i++)
-        {
-            cs_to_file_ch[i] = i;
-        }
-    }
-
-    return isRGB;
-}
+#include "internal_ht_common.h"
 
 extern "C" exr_result_t
 internal_exr_undo_ht (
@@ -84,9 +32,8 @@ internal_exr_undo_ht (
 {
     exr_result_t rv = EXR_ERR_SUCCESS;
 
-    assert (decode->channel_count <= 6);
-    int cs_to_file_ch[6];
-    int isRGB = make_channel_map (
+    std::vector<int> cs_to_file_ch (decode->channel_count);
+    bool             isRGB = make_channel_map (
         decode->channel_count, decode->channels, cs_to_file_ch);
 
     ojph::mem_infile infile;
@@ -141,15 +88,13 @@ internal_exr_undo_ht (
     return rv;
 }
 
-extern "C"
-exr_result_t
+extern "C" exr_result_t
 internal_exr_apply_ht (exr_encode_pipeline_t* encode)
 {
     exr_result_t rv = EXR_ERR_SUCCESS;
 
-    assert (encode->channel_count <= 6);
-    int cs_to_file_ch[6];
-    int isRGB = make_channel_map (
+    std::vector<int> cs_to_file_ch(encode->channel_count);
+    bool isRGB = make_channel_map (
         encode->channel_count, encode->channels, cs_to_file_ch);
 
     int height = encode->channels[0].height;
