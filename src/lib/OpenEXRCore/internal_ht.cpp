@@ -187,7 +187,7 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
         encode->packed_bytes == (encode->channel_count * 2 * height * width));
 
     const int16_t* line_pixels =
-        static_cast<const int16_t*> (encode->packed_sample_count_table);
+        static_cast<const int16_t*> (encode->packed_buffer);
     ojph::ui32      next_comp = 0;
     ojph::line_buf* cur_line  = cs.exchange (NULL, next_comp);
 

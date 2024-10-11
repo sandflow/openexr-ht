@@ -26,33 +26,13 @@ OPENEXR_IMF_INTERNAL_NAMESPACE_HEADER_ENTER
 class HTCompressor : public Compressor
 {
 public:
-    HTCompressor (const Header& hdr, size_t maxScanLineSize, int numScanLines = 0);
-
+    HTCompressor (const Header& hdr, size_t maxScanLineSize, int numScanLines);
     virtual ~HTCompressor ();
 
-    HTCompressor (const HTCompressor& other) = delete;
+    HTCompressor (const HTCompressor& other)            = delete;
     HTCompressor& operator= (const HTCompressor& other) = delete;
     HTCompressor (HTCompressor&& other)                 = delete;
-    HTCompressor& operator= (HTCompressor&& other) = delete;
-
-    virtual int numScanLines () const;
-
-    virtual Format format () const;
-
-    virtual int
-    compress (const char* inPtr, int inSize, int minY, const char*& outPtr);
-
-    virtual int
-    uncompress (const char* inPtr, int inSize, int minY, const char*& outPtr);
-
-private:
-    ojph::ui32                 _width;
-    ojph::ui32                 _height;
-    ojph::mem_outfile          _output;
-    int                        _num_comps;
-    int16_t*                   _buffer;
-    std::vector<int>           _cs_to_file_ch;    /* maps from codestream channel to file channel */
-    bool                       _isRGB;
+    HTCompressor& operator= (HTCompressor&& other)      = delete;
 };
 
 OPENEXR_IMF_INTERNAL_NAMESPACE_HEADER_EXIT
