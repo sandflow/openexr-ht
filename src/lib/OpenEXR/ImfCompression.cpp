@@ -178,8 +178,26 @@ static const CompressionDesc IdToDesc[] = {
         false),
     CompressionDesc (
         "ht",
-        "High-Throughtput JPEG 2000 (full frame)",
+        "High-Throughtput JPEG 2000 (OpenJPH, full frame)",
         16000,
+        true,
+        false),
+    CompressionDesc (
+        "ht256",
+        "High-Throughtput JPEG 2000 (OpenJPH, 256 lines)",
+        256,
+        true,
+        false),
+    CompressionDesc (
+        "htk",
+        "High-Throughtput JPEG 2000 (Kakadu, full frame)",
+        16000,
+        true,
+        false),
+    CompressionDesc (
+        "htk256",
+        "High-Throughtput JPEG 2000 (Kakadu, 256 lines)",
+        256,
         true,
         false),
 };
@@ -200,6 +218,8 @@ static const std::map<std::string, Compression> CompressionNameToId = {
     {"dwab", Compression::DWAB_COMPRESSION},
     {"ht", Compression::HT_COMPRESSION},
     {"ht256", Compression::HT256_COMPRESSION},
+    {"htk", Compression::HTK_COMPRESSION},
+    {"htk256", Compression::HTK256_COMPRESSION},
 };
 
 #define UNKNOWN_COMPRESSION_ID_MSG "INVALID COMPRESSION ID"

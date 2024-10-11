@@ -367,6 +367,9 @@ exr_compress_chunk (exr_encode_pipeline_t* encode)
         case EXR_COMPRESSION_HT:
         case EXR_COMPRESSION_HT256:
             rv = internal_exr_apply_ht (encode); break;
+        case EXR_COMPRESSION_HTK:
+        case EXR_COMPRESSION_HTK256:
+            rv = internal_exr_apply_ht (encode); break;
         case EXR_COMPRESSION_LAST_TYPE:
         default:
             return ctxt->print_error (
@@ -446,6 +449,11 @@ decompress_data (
         case EXR_COMPRESSION_HT:
         case EXR_COMPRESSION_HT256:
             rv = internal_exr_undo_ht (
+                decode, packbufptr, packsz, unpackbufptr, unpacksz);
+            break;
+        case EXR_COMPRESSION_HTK:
+        case EXR_COMPRESSION_HTK256:
+            rv = internal_exr_undo_htk (
                 decode, packbufptr, packsz, unpackbufptr, unpacksz);
             break;
         case EXR_COMPRESSION_LAST_TYPE:
