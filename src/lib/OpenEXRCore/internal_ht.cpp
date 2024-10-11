@@ -107,7 +107,6 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
     for (ojph::ui32 c = 0; c < encode->channel_count; c++)
         siz.set_component (c, ojph::point (1, 1), 16, true);
 
-    /* TODO: extend to multiple tiles and non-coincident data and display windows */
     siz.set_image_offset (ojph::point (0, 0));
     siz.set_tile_offset (ojph::point (0, 0));
     siz.set_image_extent (ojph::point (width, height));
