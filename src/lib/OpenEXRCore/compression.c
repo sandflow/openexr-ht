@@ -227,6 +227,10 @@ int exr_compression_lines_per_chunk (exr_compression_t comptype)
         case EXR_COMPRESSION_B44A:
         case EXR_COMPRESSION_DWAA: linePerChunk = 32; break;
         case EXR_COMPRESSION_DWAB: linePerChunk = 256; break;
+        case EXR_COMPRESSION_HT: linePerChunk = 16000; break;
+        case EXR_COMPRESSION_HT256: linePerChunk = 256; break;
+        case EXR_COMPRESSION_HTK: linePerChunk = 16000; break;
+        case EXR_COMPRESSION_HTK256: linePerChunk = 256; break;
         case EXR_COMPRESSION_LAST_TYPE:
         default:
             /* ERROR CONDITION */
@@ -434,6 +438,10 @@ decompress_data (
             break;
         case EXR_COMPRESSION_DWAB:
             rv = internal_exr_undo_dwab (
+                decode, packbufptr, packsz, unpackbufptr, unpacksz);
+            break;
+        case EXR_COMPRESSION_HT:
+            rv = internal_exr_undo_ht (
                 decode, packbufptr, packsz, unpackbufptr, unpacksz);
             break;
         case EXR_COMPRESSION_LAST_TYPE:
