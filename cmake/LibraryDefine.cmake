@@ -28,7 +28,9 @@ function(OPENEXR_DEFINE_LIBRARY libname)
   target_include_directories(${objlib} PRIVATE ${openjph_SOURCE_DIR}/src/core/common)
 
   # we are including KDU
-  target_include_directories(${objlib} PRIVATE ${KDU_INCLUDE_DIR})
+  if( KDU_INCLUDE_DIR )
+    target_include_directories(${objlib} PRIVATE ${KDU_INCLUDE_DIR})
+  endif()
 
   # we are embedding libdeflate
   target_include_directories(${objlib} PRIVATE ${EXR_DEFLATE_INCLUDE_DIR})
@@ -51,7 +53,11 @@ function(OPENEXR_DEFINE_LIBRARY libname)
     target_compile_definitions(${objlib} PRIVATE KDU_AVAILABLE=1)
   endif()
 
-  target_link_libraries(${objlib} PUBLIC ${PROJECT_NAME}::Config ${OPENEXR_CURLIB_DEPENDENCIES} ${KDU_LIBRARY} ${CMAKE_DL_LIBS} openjph)
+  if(KDU_LIBRARY)
+    target_link_libraries(${objlib} PUBLIC ${PROJECT_NAME}::Config ${OPENEXR_CURLIB_DEPENDENCIES} ${KDU_LIBRARY} ${CMAKE_DL_LIBS} openjph)
+  else()
+    target_link_libraries(${objlib} PUBLIC ${PROJECT_NAME}::Config ${OPENEXR_CURLIB_DEPENDENCIES} ${CMAKE_DL_LIBS} openjph)
+  endif()
   if(OPENEXR_CURLIB_PRIVATE_DEPS)
     target_link_libraries(${objlib} PRIVATE ${OPENEXR_CURLIB_PRIVATE_DEPS})
   endif()

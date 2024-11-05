@@ -221,7 +221,7 @@ internal_exr_apply_htk (exr_encode_pipeline_t* encode)
 
 #else
 
-#error
+//#error
 
 extern "C" exr_result_t
 internal_exr_undo_htk (
