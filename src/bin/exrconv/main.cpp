@@ -14,13 +14,24 @@ namespace IMF = OPENEXR_IMF_NAMESPACE;
 using namespace OPENEXR_IMF_NAMESPACE;
 using namespace IMATH_NAMESPACE;
 
+#define MAX_PATH_LENGTH 512
+
+typedef struct _filename_parts
+{
+  char prefix[MAX_PATH_LENGTH];
+  char suffix[MAX_PATH_LENGTH];
+  unsigned int number_of_digits;
+} filename_parts_t;
+
 typedef struct _commandline_args
 {
-  char input_filename[512];
-  char output_filename[512];
+  char input_filename[MAX_PATH_LENGTH];
+  char output_filename[MAX_PATH_LENGTH];
+  filename_parts_t input_filename_parts;
+  filename_parts_t output_filename_parts;
   unsigned int start_frame;
   unsigned int end_frame;
-  char compression_string[512];
+  char compression_string[MAX_PATH_LENGTH];
   bool is_process_framerange;
 } commandline_args_t;
 
@@ -56,8 +67,6 @@ void print_argument_list(int argc, char* argv[])
   return;
 }
 
-
-
 void print_allowed_compression_strings()
 {
   for (int i = 0; i < (int)NUM_COMPRESSION_METHODS; i++)
@@ -73,16 +82,17 @@ void print_usage(int argc, char* argv[])
   fprintf(stderr, "This program converts exr images to exr images with different image compression\n");
   fprintf(stderr, "USAGE: %s \n", argv[0]);
   fprintf(stderr, "\nREQUIRED ARGUMENTS:\n");
-  fprintf(stderr, " -i <input_filename> - exr filename - use printf() style formatting for an input sequence, e.g. input.%%06d.exr\n");
-  fprintf(stderr, " -o <output_filename> - exr filename - use printf() style formatting for an output sequence e.g. output.%%06d.exr\n");
+  fprintf(stderr, " -i <input_filename>  - exr filename - use # symbols for input sequence frame number digits, e.g.  input.######.exr\n");
+  fprintf(stderr, " -o <output_filename> - exr filename - use # symbols for input sequence frame number digits, e.g. output.######.exr\n");
   fprintf(stderr, "\nOPTIONAL ARGUMENTS:\n");
   fprintf(stderr, " -c <compression_string> - use this to specify different image compression for the output\n");
+  fprintf(stderr, "\tsupported compression strings:\n");
   print_allowed_compression_strings();
   fprintf(stderr, " -s <start_frame>\n");
   fprintf(stderr, " -e <end_frame>\n");
 
-  fprintf(stderr, "\nUSAGE EXAMPLE: %s -i input.exr -o output.%%01d.exr\n", argv[0]);
-  fprintf(stderr, "\nUSAGE EXAMPLE: %s -i input.%%06d.exr -o output.%%07d.exr -s 3 -e 450 -c ZIP_COMPRESSION\n", argv[0]);
+  fprintf(stderr, "\nUSAGE EXAMPLE: %s -i input.exr -o output.exr -c PIZ_COMPRESSION\n", argv[0]);
+  fprintf(stderr, "\nUSAGE EXAMPLE: %s -i input.####.exr -o output.######.exr -s 3 -e 450 -c ZIP_COMPRESSION\n", argv[0]);
 
 
   if (argc != 1)
@@ -277,6 +287,81 @@ int process_commandline_args(int argc, char* argv[], commandline_args_t *args)
   return 0;
 }
 
+void split_filename_with_symbols_into_parts( char* input_string_with_symbols_to_find, char* prefix, char* suffix, unsigned int* number_of_digits)
+{
+  // this function splits an input string with sequential symbols into prefix, suffix and number of digits
+  // for example test.####.tif will be split into prefix = test. suffix = .tif and number_of_digits = 4
+
+  const char* symbol_to_find = "#";
+
+  *number_of_digits = 0;
+  bool keep_searching = true;
+  char* found_search_result = NULL;
+  while (true == keep_searching && *number_of_digits < 64 )
+  {
+    char symbols_to_find[MAX_PATH_LENGTH] = { '\0' };
+    for (size_t i = 1; i <= (size_t)*number_of_digits + 1; i++)
+    {
+      strncat(symbols_to_find, symbol_to_find, 1);
+    }
+    char* search_result = strstr(input_string_with_symbols_to_find, symbols_to_find);
+    if (search_result)
+    {
+      found_search_result = search_result;
+      *number_of_digits = *number_of_digits + 1;
+    }
+    else
+    {
+      keep_searching = false;
+    }
+
+  };
+
+  if (*number_of_digits > 64)
+  {
+    fprintf(stderr, "WARNING on line %d of file %s in function %s:\n number_of_digits = %d is greater than 64\n",
+      __LINE__, __FILE__, __FUNCTION__, *number_of_digits);
+  }
+
+  if (NULL != found_search_result)
+  {
+    // find prefix
+    size_t number_of_prefix_chars = found_search_result - input_string_with_symbols_to_find;
+    strncpy(prefix, input_string_with_symbols_to_find, number_of_prefix_chars);
+    // find suffix
+    size_t input_string_length = strlen(input_string_with_symbols_to_find);
+    strncpy(suffix, &found_search_result[*number_of_digits], (size_t)(input_string_length - *number_of_digits));
+  }
+  else
+  {
+    // since no symbols were found, just copy the filename into prefix
+    size_t number_of_prefix_chars = strnlen(input_string_with_symbols_to_find, MAX_PATH_LENGTH);
+    strncpy(prefix, input_string_with_symbols_to_find, number_of_prefix_chars);
+  }
+  
+  return;
+}
+
+void make_filename(char* output_string, const char* prefix, const char* suffix, const unsigned int number_of_digits, const unsigned int frame_number)
+{
+  size_t max_string_copy = sizeof(prefix) + sizeof(suffix) + (size_t)number_of_digits;
+
+  if (number_of_digits > 0)
+  {
+    char string_formatting[MAX_PATH_LENGTH] = { '\0' };
+    // make a string with the appropriate number of digits, like "%s%06d%s"
+    snprintf(string_formatting, sizeof(string_formatting), "%%s%%0%dd%%s", number_of_digits);
+
+    snprintf(output_string, max_string_copy, string_formatting, prefix, frame_number, suffix);
+  }
+  else
+  { 
+    snprintf(output_string, max_string_copy, "%s%s", prefix, suffix);
+  }
+
+  return;
+}
+
 int check_commandline_args(commandline_args_t *args)
 {
 
@@ -291,6 +376,16 @@ int check_commandline_args(commandline_args_t *args)
     }
   }
 
+  // split filenames into parts
+  split_filename_with_symbols_into_parts( args->input_filename, 
+    args->input_filename_parts.prefix, 
+    args->input_filename_parts.suffix, 
+    &(args->input_filename_parts.number_of_digits));
+  split_filename_with_symbols_into_parts( args->output_filename, 
+    args->output_filename_parts.prefix, 
+    args->output_filename_parts.suffix, 
+    &(args->output_filename_parts.number_of_digits));
+
   // check that the we have access to the range of input files specified
   const unsigned int number_of_frames_to_process = args->end_frame - args->start_frame + 1;
 
@@ -303,8 +398,13 @@ int check_commandline_args(commandline_args_t *args)
     }
 
     // make image filename
-    char input_filename[512] = { '\0' };
-    sprintf(input_filename, args->input_filename, frame_index + args->start_frame);
+    char input_filename[2*MAX_PATH_LENGTH] = { '\0' };
+    //sprintf(input_filename, args->input_filename, frame_index + args->start_frame);
+    make_filename( input_filename, 
+      args->input_filename_parts.prefix, 
+      args->input_filename_parts.suffix, 
+      args->input_filename_parts.number_of_digits, 
+      frame_index + args->start_frame);
 
     // try to open image file
     {
@@ -355,6 +455,7 @@ Compression get_compression_from_compression_string(const char* compression_stri
   return NO_COMPRESSION;
 }
 
+
 int main(int argc, char* argv[])
 {
   // process command line arguments
@@ -386,10 +487,20 @@ int main(int argc, char* argv[])
   for (unsigned int frame_index = 0; frame_index < number_of_frames_to_process; frame_index++)
   {
     // make image filenames
-    char input_filename[512] = { '\0' };
-    char output_filename[512] = { '\0' };
-    sprintf(input_filename, args.input_filename, frame_index + args.start_frame);
-    sprintf(output_filename, args.output_filename, frame_index + args.start_frame);
+    char input_filename[2*MAX_PATH_LENGTH] = { '\0' };
+    char output_filename[2*MAX_PATH_LENGTH] = { '\0' };
+    //sprintf(input_filename, args.input_filename, frame_index + args.start_frame);
+    //sprintf(output_filename, args.output_filename, frame_index + args.start_frame);
+    make_filename( input_filename, 
+      args.input_filename_parts.prefix, 
+      args.input_filename_parts.suffix, 
+      args.input_filename_parts.number_of_digits, 
+      frame_index + args.start_frame);
+    make_filename( output_filename, 
+      args.output_filename_parts.prefix, 
+      args.output_filename_parts.suffix, 
+      args.output_filename_parts.number_of_digits, 
+      frame_index + args.start_frame);
 
     RgbaInputFile i_file(input_filename);
 
