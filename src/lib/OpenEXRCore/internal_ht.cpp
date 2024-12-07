@@ -51,34 +51,61 @@ internal_exr_undo_ht (
     assert (decode->chunk.height == height);
     assert (decode->channel_count == siz.get_num_components ());
 
-    assert (decode->channel_count * 2 * width * height == uncompressed_size);
+    ojph::param_nlt nlt = cs.access_nlt();
+
+    int data_type = decode->channels[0].data_type;
+    int bpe = decode->channels[0].bytes_per_element;
+
+    for (ojph::ui32 c = 0; c < decode->channel_count; c++) {
+        assert(decode->channels[c].y_samples == 1);
+        assert(decode->channels[c].x_samples == 1);
+        assert(decode->channels[c].data_type == data_type);
+        assert(decode->channels[c].bytes_per_element == bpe);
+        assert(decode->channels[c].width == width);
+    }
+
+    assert (decode->channel_count * bpe * width * height == uncompressed_size);
 
     cs.set_planar (false);
 
     cs.create ();
 
-    assert (sizeof (int16_t) == 2);
-    int16_t* line_pixels = static_cast<int16_t*> (uncompressed_data);
+    assert (sizeof (uint16_t) == 2);
+    assert (sizeof (uint32_t) == 4);
 
-    for (uint32_t i = 0; i < height; ++i)
+    if (data_type == EXR_PIXEL_HALF)
     {
-
-        for (uint32_t c = 0; c < decode->channel_count; c++)
+        uint16_t* line_pixels = static_cast<uint16_t*> (uncompressed_data);
+        for (uint32_t i = 0; i < height; ++i)
         {
-            ojph::ui32      next_comp = 0;
-            ojph::line_buf* cur_line  = cs.pull (next_comp);
-
-            assert (next_comp == c);
-
-            int16_t* channel_pixels = line_pixels + width * cs_to_file_ch[c];
-
-            for (uint32_t p = 0; p < width; p++)
+            for (uint32_t c = 0; c < decode->channel_count; c++)
             {
-                *channel_pixels++ = (int16_t) (cur_line->i32[p]);
-            }
-        }
+                ojph::ui32 next_comp      = 0;
+                ojph::line_buf* cur_line  = cs.pull (next_comp);
 
-        line_pixels += width * decode->channel_count;
+                assert (next_comp == c);
+                uint16_t* channel_pixels = line_pixels + width * cs_to_file_ch[c];
+                for (uint32_t p = 0; p < width; p++)
+                    *channel_pixels++ = (uint16_t) (cur_line->i32[p]);
+            }
+            line_pixels += width * decode->channel_count;
+        }
+    } else {
+        uint32_t* line_pixels = static_cast<uint32_t*> (uncompressed_data);
+        for (uint32_t i = 0; i < height; ++i)
+        {
+            for (uint32_t c = 0; c < decode->channel_count; c++)
+            {
+                ojph::ui32 next_comp      = 0;
+                ojph::line_buf* cur_line  = cs.pull (next_comp);
+
+                assert (next_comp == c);
+                uint32_t* channel_pixels = line_pixels + width * cs_to_file_ch[c];
+                for (uint32_t p = 0; p < width; p++)
+                    *channel_pixels++ = (uint32_t) (cur_line->i64[p]);
+            }
+            line_pixels += width * decode->channel_count;
+        }
     }
 
     infile.close ();
@@ -102,10 +129,22 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
     cs.set_planar (false);
 
     ojph::param_siz siz = cs.access_siz ();
+    ojph::param_nlt nlt = cs.access_nlt();
+
+    int data_type = encode->channels[0].data_type;
+    int bpe = encode->channels[0].bytes_per_element;
 
     siz.set_num_components (encode->channel_count);
-    for (ojph::ui32 c = 0; c < encode->channel_count; c++)
-        siz.set_component (c, ojph::point (1, 1), 16, true);
+    for (ojph::ui32 c = 0; c < encode->channel_count; c++) {
+        assert(encode->channels[c].y_samples == 1);
+        assert(encode->channels[c].x_samples == 1);
+        assert(encode->channels[c].data_type == data_type);
+        assert(encode->channels[c].bytes_per_element == bpe);
+        assert(encode->channels[c].width == width);
+
+        siz.set_component (c, ojph::point (1, 1), encode->channels[c].data_type == EXR_PIXEL_HALF ? 16: 32, true);
+        nlt.set_type3_transformation(c, encode->channels[c].data_type != EXR_PIXEL_UINT);
+    }
 
     siz.set_image_offset (ojph::point (0, 0));
     siz.set_tile_offset (ojph::point (0, 0));
@@ -119,9 +158,6 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
     cod.set_block_dims (128, 32);
     cod.set_num_decomposition (5);
 
-    ojph::param_nlt nlt = cs.access_nlt();
-    nlt.set_type3_transformation(65535, true);
-
     ojph::mem_outfile output;
 
     output.open ();
@@ -129,33 +165,44 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
     cs.write_headers (&output);
 
     assert (
-        encode->packed_bytes == (encode->channel_count * 2 * height * width));
+        encode->packed_bytes == (encode->channel_count * bpe * height * width));
 
-    const int16_t* line_pixels =
-        static_cast<const int16_t*> (encode->packed_buffer);
     ojph::ui32      next_comp = 0;
     ojph::line_buf* cur_line  = cs.exchange (NULL, next_comp);
 
-    for (ojph::ui32 i = 0; i < height; ++i)
+    if (data_type == EXR_PIXEL_HALF)
     {
-        const char* in_buf;
-
-        for (ojph::ui32 c = 0; c < encode->channel_count; c++)
+        const int16_t* line_pixels = static_cast<const int16_t*> (encode->packed_buffer);
+        for (ojph::ui32 i = 0; i < height; ++i)
         {
-            assert (next_comp == c);
-
-            const int16_t* channel_pixels =
-                line_pixels + width * cs_to_file_ch[c];
-
-            for (uint32_t p = 0; p < width; p++)
+            const char* in_buf;
+            for (ojph::ui32 c = 0; c < encode->channel_count; c++)
             {
-                cur_line->i32[p] = static_cast<const ojph::si32> (*channel_pixels++);
+                assert (next_comp == c);
+                const int16_t* channel_pixels =
+                    line_pixels + width * cs_to_file_ch[c];
+                for (uint32_t p = 0; p < width; p++)
+                    cur_line->i32[p] = static_cast<const ojph::si32> (*channel_pixels++);
+                cur_line = cs.exchange (cur_line, next_comp);
             }
-
-            cur_line = cs.exchange (cur_line, next_comp);
+            line_pixels += width * encode->channel_count;
         }
-
-        line_pixels += width * encode->channel_count;
+    } else {
+        const uint32_t* line_pixels = static_cast<const uint32_t*> (encode->packed_buffer);
+        for (ojph::ui32 i = 0; i < height; ++i)
+        {
+            const char* in_buf;
+            for (ojph::ui32 c = 0; c < encode->channel_count; c++)
+            {
+                assert (next_comp == c);
+                const uint32_t* channel_pixels =
+                    line_pixels + width * cs_to_file_ch[c];
+                for (uint32_t p = 0; p < width; p++)
+                    cur_line->i64[p] = static_cast<const ojph::si32> (*channel_pixels++);
+                cur_line = cs.exchange (cur_line, next_comp);
+            }
+            line_pixels += width * encode->channel_count;
+        }
     }
 
     cs.flush ();

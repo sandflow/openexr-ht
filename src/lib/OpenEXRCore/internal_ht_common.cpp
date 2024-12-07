@@ -29,7 +29,6 @@ make_channel_map (
 
     for (size_t i = 0; i < channel_count; i++)
     {
-        assert (channels[i].data_type == EXR_PIXEL_HALF);
         assert (channels[i].x_samples == 1);
         assert (channels[i].y_samples == 1);
 
