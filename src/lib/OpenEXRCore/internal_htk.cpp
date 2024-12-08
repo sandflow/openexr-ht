@@ -17,7 +17,7 @@
 #include <vector>
 #include <string>
 
-#ifdef KDU_AVAILABLE
+#if 0
 
 #    include "openexr_compression.h"
 #    include "kdu_elementary.h"
