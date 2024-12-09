@@ -79,13 +79,6 @@ internal_exr_undo_ht (
             int file_i = cs_to_file_ch[c].file_index;
             assert ((decode->channels[file_i].data_type == EXR_PIXEL_HALF ? 16 : 32) == siz.get_bit_depth(c));
             assert ((decode->channels[file_i].data_type != EXR_PIXEL_UINT) == siz.is_signed(c));
-            uint8_t bpp;
-            bool is_signed;
-            assert ((decode->channels[file_i].data_type != EXR_PIXEL_UINT) == nlt.get_type3_transformation(c, bpp, is_signed));
-            if (decode->channels[file_i].data_type != EXR_PIXEL_UINT) {
-                assert ((decode->channels[file_i].data_type == EXR_PIXEL_HALF ? 16 : 32) == bpp);
-                assert ((decode->channels[file_i].data_type != EXR_PIXEL_UINT) == is_signed);
-            }
 
             ojph::ui32      next_comp = 0;
             ojph::line_buf* cur_line  = cs.pull (next_comp);
@@ -96,25 +89,16 @@ internal_exr_undo_ht (
                     (int16_t*) (line_pixels + cs_to_file_ch[c].raster_line_offset);
                 for (uint32_t p = 0; p < decode->channels[file_i].width; p++) {
                     *channel_pixels++ = (int16_t) (cur_line->i32[p]);
-                    assert(*(channel_pixels - 1) == 0);
-                }
-            }
-            else if (decode->channels[file_i].data_type == EXR_PIXEL_FLOAT)
-            {
-                int32_t* channel_pixels =
-                    (int32_t*) (line_pixels + cs_to_file_ch[c].raster_line_offset);
-                for (uint32_t p = 0; p < decode->channels[file_i].width; p++) {
-                    *channel_pixels++ = (int32_t) (cur_line->i32[p]);
-                    assert(*(channel_pixels - 1) == 0);
+                    // assert(*(channel_pixels - 1) == 0);
                 }
             }
             else
             {
-                uint32_t* channel_pixels =
-                    (uint32_t*) (line_pixels + cs_to_file_ch[c].raster_line_offset);
+                int32_t* channel_pixels =
+                    (int32_t*) (line_pixels + cs_to_file_ch[c].raster_line_offset);
                 for (uint32_t p = 0; p < decode->channels[file_i].width; p++) {
-                    *channel_pixels++ = (uint32_t) (cur_line->i32[p]);
-                    assert(*(channel_pixels - 1) == 0);
+                    *channel_pixels++ = cur_line->i32[p];
+                    // assert(*(channel_pixels - 1) == 0);
                 }
             }
         }
