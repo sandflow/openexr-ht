@@ -270,7 +270,7 @@ include(FetchContent)
 FetchContent_Declare(
   openjph
   GIT_REPOSITORY https://github.com/aous72/OpenJPH
-  GIT_TAG        origin/master
+  GIT_TAG        0.18.2
 )
 
 FetchContent_MakeAvailable(openjph)

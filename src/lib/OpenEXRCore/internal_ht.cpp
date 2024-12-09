@@ -3,6 +3,8 @@
 ** Copyright Contributors to the OpenEXR Project.
 */
 
+#include <fstream>
+
 #include "internal_compress.h"
 #include "internal_decompress.h"
 
@@ -75,6 +77,16 @@ internal_exr_undo_ht (
         for (uint32_t c = 0; c < decode->channel_count; c++)
         {
             int file_i = cs_to_file_ch[c].file_index;
+            assert ((decode->channels[file_i].data_type == EXR_PIXEL_HALF ? 16 : 32) == siz.get_bit_depth(c));
+            assert ((decode->channels[file_i].data_type != EXR_PIXEL_UINT) == siz.is_signed(c));
+            uint8_t bpp;
+            bool is_signed;
+            assert ((decode->channels[file_i].data_type != EXR_PIXEL_UINT) == nlt.get_type3_transformation(c, bpp, is_signed));
+            if (decode->channels[file_i].data_type != EXR_PIXEL_UINT) {
+                assert ((decode->channels[file_i].data_type == EXR_PIXEL_HALF ? 16 : 32) == bpp);
+                assert ((decode->channels[file_i].data_type != EXR_PIXEL_UINT) == is_signed);
+            }
+
             ojph::ui32      next_comp = 0;
             ojph::line_buf* cur_line  = cs.pull (next_comp);
             assert (next_comp == c);
@@ -137,6 +149,8 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
     for (ojph::ui32 c = 0; c < encode->channel_count; c++)
     {
         int file_i = cs_to_file_ch[c].file_index;
+        nlt.set_type3_transformation (
+            c, encode->channels[file_i].data_type != EXR_PIXEL_UINT);
         siz.set_component (
             c,
             ojph::point (
@@ -145,8 +159,7 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
             encode->channels[file_i].data_type != EXR_PIXEL_UINT);
         bytes_per_line +=
             encode->channels[file_i].bytes_per_element * encode->channels[file_i].width;
-        nlt.set_type3_transformation (
-            c, encode->channels[file_i].data_type != EXR_PIXEL_UINT);
+
     }
 
     siz.set_image_offset (ojph::point (0, 0));
