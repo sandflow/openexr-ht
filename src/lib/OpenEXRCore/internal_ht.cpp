@@ -74,32 +74,39 @@ internal_exr_undo_ht (
     {
         for (uint32_t c = 0; c < decode->channel_count; c++)
         {
+            int file_i = cs_to_file_ch[c].file_index;
             ojph::ui32      next_comp = 0;
             ojph::line_buf* cur_line  = cs.pull (next_comp);
             assert (next_comp == c);
-            if (decode->channels[c].data_type == EXR_PIXEL_HALF)
+            if (decode->channels[file_i].data_type == EXR_PIXEL_HALF)
             {
                 int16_t* channel_pixels =
                     (int16_t*) (line_pixels + cs_to_file_ch[c].raster_line_offset);
-                for (uint32_t p = 0; p < width; p++)
+                for (uint32_t p = 0; p < decode->channels[file_i].width; p++) {
                     *channel_pixels++ = (int16_t) (cur_line->i32[p]);
+                    assert(*(channel_pixels - 1) == 0);
+                }
             }
-            else if (decode->channels[c].data_type == EXR_PIXEL_FLOAT)
+            else if (decode->channels[file_i].data_type == EXR_PIXEL_FLOAT)
             {
                 int32_t* channel_pixels =
                     (int32_t*) (line_pixels + cs_to_file_ch[c].raster_line_offset);
-                for (uint32_t p = 0; p < width; p++)
+                for (uint32_t p = 0; p < decode->channels[file_i].width; p++) {
                     *channel_pixels++ = (int32_t) (cur_line->i32[p]);
+                    assert(*(channel_pixels - 1) == 0);
+                }
             }
             else
             {
                 uint32_t* channel_pixels =
                     (uint32_t*) (line_pixels + cs_to_file_ch[c].raster_line_offset);
-                for (uint32_t p = 0; p < width; p++)
-                    *channel_pixels++ = (uint32_t) (cur_line->i64[p]);
+                for (uint32_t p = 0; p < decode->channels[file_i].width; p++) {
+                    *channel_pixels++ = (uint32_t) (cur_line->i32[p]);
+                    assert(*(channel_pixels - 1) == 0);
+                }
             }
         }
-        line_pixels += width * decode->channel_count;
+        line_pixels += bytes_per_line;
     }
 
     infile.close ();
@@ -178,25 +185,31 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
             {
                 int16_t* channel_pixels =
                     (int16_t*) (line_pixels + cs_to_file_ch[c].raster_line_offset);
-                for (uint32_t p = 0; p < width; p++)
+                for (uint32_t p = 0; p < encode->channels[file_i].width; p++) {
+                    // assert(*channel_pixels == 0);
                     cur_line->i32[p] =
-                        static_cast<const ojph::si32> (*channel_pixels++);
+                        (ojph::si32) (*channel_pixels++);
+                }
             }
             else if (encode->channels[file_i].data_type == EXR_PIXEL_FLOAT)
             {
                 int32_t* channel_pixels =
                     (int32_t*) (line_pixels + cs_to_file_ch[c].raster_line_offset);
-                for (uint32_t p = 0; p < width; p++)
-                    cur_line->i64[p] =
-                        static_cast<const ojph::si64> (*channel_pixels++);
+                for (uint32_t p = 0; p < encode->channels[file_i].width; p++) {
+                    // assert(*channel_pixels == 0);
+                    cur_line->i32[p] =
+                        (ojph::si32) (*channel_pixels++);
+                }
             }
             else
             {
                 uint32_t* channel_pixels =
                     (uint32_t*) (line_pixels + cs_to_file_ch[c].raster_line_offset);
-                for (uint32_t p = 0; p < width; p++)
-                    cur_line->i64[p] =
-                        static_cast<const ojph::si64> (*channel_pixels++);
+                for (uint32_t p = 0; p < encode->channels[file_i].width; p++) {
+                    // assert(*channel_pixels == 0);
+                    cur_line->i32[p] =
+                       (ojph::si32) (*channel_pixels++);
+                }
             }
             cur_line = cs.exchange (cur_line, next_comp);
         }
