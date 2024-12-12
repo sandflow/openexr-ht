@@ -53,18 +53,21 @@ internal_exr_undo_ht (
     ojph::ui32 image_height =
         siz.get_image_extent ().y - siz.get_image_offset ().y;
 
-    int bytes_per_line = 0;
+    int  bpl       = 0;
+    bool is_planar = false;
     for (ojph::ui32 c = 0; c < decode->channel_count; c++)
     {
-        int file_c = cs_to_file_ch[c].file_index;
-        bytes_per_line += decode->channels[file_c].bytes_per_element *
-                          decode->channels[file_c].width;
+        bpl +=
+            decode->channels[c].bytes_per_element * decode->channels[c].width;
+        if (decode->channels[c].x_samples > 1 ||
+            decode->channels[c].y_samples > 1)
+        { is_planar = true; }
     }
+    cs.set_planar (is_planar);
 
     assert (decode->chunk.width == image_width);
     assert (decode->chunk.height == image_height);
     assert (decode->channel_count == siz.get_num_components ());
-    assert (bytes_per_line * image_height == uncompressed_size);
 
     cs.create ();
 
@@ -76,11 +79,12 @@ internal_exr_undo_ht (
     {
         for (uint32_t c = 0; c < decode->channel_count; c++)
         {
-            int        file_c = cs_to_file_ch[c].file_index;
-            assert (siz.get_recon_height (c) == decode->channels[file_c].height);
+            int file_c = cs_to_file_ch[c].file_index;
+            assert (
+                siz.get_recon_height (c) == decode->channels[file_c].height);
             assert (decode->channels[file_c].width == siz.get_recon_width (c));
 
-            if (decode->channels[c].height == 0) continue;
+            if (decode->channels[file_c].height == 0) continue;
 
             uint8_t* line_pixels = static_cast<uint8_t*> (uncompressed_data);
 
@@ -132,7 +136,10 @@ internal_exr_undo_ht (
     else
     {
         uint8_t* line_pixels = static_cast<uint8_t*> (uncompressed_data);
-        for (uint32_t i = 0; i < image_height; ++i)
+
+        assert (bpl * image_height == uncompressed_size);
+
+        for (uint32_t y = 0; y < image_height; ++y)
         {
             for (uint32_t c = 0; c < decode->channel_count; c++)
             {
@@ -142,32 +149,27 @@ internal_exr_undo_ht (
                 if (decode->channels[file_c].data_type == EXR_PIXEL_HALF)
                 {
                     int16_t* channel_pixels =
-                        (int16_t*) (line_pixels +
-                                    i / decode->channels[file_c].y_samples *
-                                        bytes_per_line +
-                                    cs_to_file_ch[c].raster_line_offset);
+                        (int16_t*) (line_pixels + cs_to_file_ch[c].raster_line_offset);
                     for (uint32_t p = 0; p < decode->channels[file_c].width;
                          p++)
                     {
-                        *channel_pixels++ = (int16_t) (cur_line->i32[p]);
-                        // assert(*(channel_pixels - 1) == 0);
+                        *channel_pixels++ = cur_line->i32[p];
+                        assert(*(channel_pixels - 1) == 0);
                     }
                 }
                 else
                 {
                     int32_t* channel_pixels =
-                        (int32_t*) (line_pixels +
-                                    i / decode->channels[file_c].y_samples *
-                                        bytes_per_line +
-                                    cs_to_file_ch[c].raster_line_offset);
+                        (int32_t*) (line_pixels + cs_to_file_ch[c].raster_line_offset);
                     for (uint32_t p = 0; p < decode->channels[file_c].width;
                          p++)
                     {
                         *channel_pixels++ = cur_line->i32[p];
-                        // assert(*(channel_pixels - 1) == 0);
+                        assert(*(channel_pixels - 1) == 0);
                     }
                 }
             }
+            line_pixels += bpl;
         }
     }
 
@@ -193,7 +195,7 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
     ojph::param_siz siz = cs.access_siz ();
     ojph::param_nlt nlt = cs.access_nlt ();
 
-    bool isPlanar = true;
+    bool isPlanar = false;
     siz.set_num_components (encode->channel_count);
     int bpl = 0;
     for (ojph::ui32 c = 0; c < encode->channel_count; c++)
@@ -209,12 +211,10 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
                 encode->channels[file_c].y_samples),
             encode->channels[file_c].data_type == EXR_PIXEL_HALF ? 16 : 32,
             encode->channels[file_c].data_type != EXR_PIXEL_UINT);
-    
+
         if (encode->channels[file_c].x_samples > 1 ||
             encode->channels[file_c].y_samples > 1)
-        {
-            isPlanar = false;
-        }
+        { isPlanar = true; }
 
         bpl += encode->channels[file_c].bytes_per_element *
                encode->channels[file_c].width;
@@ -227,7 +227,8 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
     siz.set_image_extent (ojph::point (
         encode->chunk.start_x + image_width,
         encode->chunk.start_y + image_height));
-    siz.set_tile_offset (ojph::point (0, 0));
+    siz.set_tile_offset (
+        ojph::point (encode->chunk.start_x, encode->chunk.start_x));
     siz.set_tile_size (ojph::size (image_width, image_height));
 
     ojph::param_cod cod = cs.access_cod ();
@@ -246,7 +247,7 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
     ojph::ui32      next_comp = 0;
     ojph::line_buf* cur_line  = cs.exchange (NULL, next_comp);
 
-    if (isPlanar)
+    if (cs.is_planar ())
     {
         for (ojph::ui32 c = 0; c < encode->channel_count; c++)
         {
@@ -307,6 +308,8 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
         const uint8_t* line_pixels =
             static_cast<const uint8_t*> (encode->packed_buffer);
 
+        assert (bpl * image_height == encode->packed_bytes);
+
         for (ojph::ui32 y = encode->chunk.start_y;
              y < image_height + encode->chunk.start_y;
              y++)
@@ -318,32 +321,29 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
                 if (encode->channels[file_c].data_type == EXR_PIXEL_HALF)
                 {
                     int16_t* channel_pixels =
-                        (int16_t*) (line_pixels +
-                                    cs_to_file_ch[c].raster_line_offset);
+                        (int16_t*) (line_pixels + cs_to_file_ch[c].raster_line_offset);
                     for (uint32_t p = 0; p < encode->channels[file_c].width;
                          p++)
                     {
-                        assert (*channel_pixels == 0);
                         cur_line->i32[p] = *channel_pixels++;
+                        assert (cur_line->i32[p] == 0);
                     }
                 }
                 else
                 {
                     int32_t* channel_pixels =
-                        (int32_t*) (line_pixels +
-                                    cs_to_file_ch[c].raster_line_offset);
+                        (int32_t*) (line_pixels + cs_to_file_ch[c].raster_line_offset);
                     for (uint32_t p = 0; p < encode->channels[file_c].width;
                          p++)
                     {
-                        assert (*channel_pixels == 0);
                         cur_line->i32[p] = *channel_pixels++;
+                        assert (cur_line->i32[p] == 0);
                     }
                 }
                 assert (next_comp == c);
                 cur_line = cs.exchange (cur_line, next_comp);
-
-                line_pixels += bpl;
             }
+            line_pixels += bpl;
         }
     }
 
@@ -353,16 +353,19 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
 
     int compressed_sz = static_cast<size_t> (output.tell ());
 
-    std::ofstream outf("out7.j2c", std::ios::binary);
-    outf.write((char*) output.get_data (), compressed_sz);
-    outf.close();
+    std::ofstream outf ("out7.j2c", std::ios::binary);
+    outf.write ((char*) output.get_data (), compressed_sz);
+    outf.close ();
 
     if (compressed_sz < encode->packed_bytes)
     {
         memcpy (encode->compressed_buffer, output.get_data (), compressed_sz);
         encode->compressed_bytes = compressed_sz;
     }
-    else { encode->compressed_bytes = encode->packed_bytes; }
+    else
+    {
+        encode->compressed_bytes = encode->packed_bytes;
+    }
 
     return rv;
 }
