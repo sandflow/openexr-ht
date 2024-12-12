@@ -111,7 +111,7 @@ internal_exr_undo_ht (
                                  p++)
                             {
                                 *channel_pixels++ = cur_line->i32[p];
-                                assert (*(channel_pixels - 1) == 0);
+                                // assert (*(channel_pixels - 1) == 0);
                             }
                         }
                         else
@@ -122,7 +122,7 @@ internal_exr_undo_ht (
                                  p++)
                             {
                                 *channel_pixels++ = cur_line->i32[p];
-                                assert (*(channel_pixels - 1) == 0);
+                                // assert (*(channel_pixels - 1) == 0);
                             }
                         }
                     }
@@ -154,7 +154,7 @@ internal_exr_undo_ht (
                          p++)
                     {
                         *channel_pixels++ = cur_line->i32[p];
-                        assert(*(channel_pixels - 1) == 0);
+                        // assert (*(channel_pixels - 1) == 0);
                     }
                 }
                 else
@@ -165,7 +165,7 @@ internal_exr_undo_ht (
                          p++)
                     {
                         *channel_pixels++ = cur_line->i32[p];
-                        assert(*(channel_pixels - 1) == 0);
+                        // assert (*(channel_pixels - 1) == 0);
                     }
                 }
             }
@@ -222,15 +222,8 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
 
     cs.set_planar (isPlanar);
 
-    siz.set_image_offset (
-        ojph::point (encode->chunk.start_x, encode->chunk.start_y));
-    siz.set_image_extent (ojph::point (
-        encode->chunk.start_x + image_width,
-        encode->chunk.start_y + image_height));
-    siz.set_tile_offset (
-        ojph::point (encode->chunk.start_x, encode->chunk.start_x));
-    siz.set_tile_size (ojph::size ( encode->chunk.start_x + image_width,
-        encode->chunk.start_y + image_height));
+    siz.set_image_offset (ojph::point (0, 0));
+    siz.set_image_extent (ojph::point (image_width, image_height));
 
     ojph::param_cod cod = cs.access_cod ();
 
@@ -278,7 +271,7 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
                                  p < encode->channels[file_c].width;
                                  p++)
                             {
-                                assert (*channel_pixels == 0);
+                                // assert (*channel_pixels == 0);
                                 cur_line->i32[p] = *channel_pixels++;
                             }
                         }
@@ -289,7 +282,7 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
                                  p < encode->channels[file_c].width;
                                  p++)
                             {
-                                assert (*channel_pixels == 0);
+                                // assert (*channel_pixels == 0);
                                 cur_line->i32[p] = *channel_pixels++;
                             }
                         }
@@ -327,7 +320,7 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
                          p++)
                     {
                         cur_line->i32[p] = *channel_pixels++;
-                        assert (cur_line->i32[p] == 0);
+                        //assert (cur_line->i32[p] == 0);
                     }
                 }
                 else
@@ -338,7 +331,7 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
                          p++)
                     {
                         cur_line->i32[p] = *channel_pixels++;
-                        assert (cur_line->i32[p] == 0);
+                        //assert (cur_line->i32[p] == 0);
                     }
                 }
                 assert (next_comp == c);
