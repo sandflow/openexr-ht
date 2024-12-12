@@ -88,7 +88,7 @@ internal_exr_undo_ht (
 
             uint8_t* line_pixels = static_cast<uint8_t*> (uncompressed_data);
 
-            for (ojph::ui32 y = decode->chunk.start_y;
+            for (int64_t y = decode->chunk.start_y;
                  y < image_height + decode->chunk.start_y;
                  y++)
             {
@@ -216,6 +216,8 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
             encode->channels[file_c].y_samples > 1)
         { isPlanar = true; }
 
+        // std::cout << "  Component number, color, bitdepth: " << c << ", " << encode->channels[file_c].channel_name << ", " << siz.get_bit_depth(c) << std::endl;
+
         bpl += encode->channels[file_c].bytes_per_element *
                encode->channels[file_c].width;
     }
@@ -251,7 +253,7 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
                 static_cast<const uint8_t*> (encode->packed_buffer);
             int file_c = cs_to_file_ch[c].file_index;
 
-            for (ojph::ui32 y = encode->chunk.start_y;
+            for (int64_t y = encode->chunk.start_y;
                  y < image_height + encode->chunk.start_y;
                  y++)
             {
@@ -304,9 +306,7 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
 
         assert (bpl * image_height == encode->packed_bytes);
 
-        for (ojph::ui32 y = encode->chunk.start_y;
-             y < image_height + encode->chunk.start_y;
-             y++)
+        for (int y = 0; y < image_height; y++)
         {
             for (ojph::ui32 c = 0; c < encode->channel_count; c++)
             {
@@ -347,9 +347,9 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
 
     int compressed_sz = static_cast<size_t> (output.tell ());
 
-    std::ofstream outf ("out7.j2c", std::ios::binary);
-    outf.write ((char*) output.get_data (), compressed_sz);
-    outf.close ();
+    // std::ofstream outf ("out7.j2c", std::ios::binary);
+    // outf.write ((char*) output.get_data (), compressed_sz);
+    // outf.close ();
 
     if (compressed_sz < encode->packed_bytes)
     {
