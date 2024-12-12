@@ -229,7 +229,8 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
         encode->chunk.start_y + image_height));
     siz.set_tile_offset (
         ojph::point (encode->chunk.start_x, encode->chunk.start_x));
-    siz.set_tile_size (ojph::size (image_width, image_height));
+    siz.set_tile_size (ojph::size ( encode->chunk.start_x + image_width,
+        encode->chunk.start_y + image_height));
 
     ojph::param_cod cod = cs.access_cod ();
 
