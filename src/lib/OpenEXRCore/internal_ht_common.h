@@ -17,8 +17,13 @@
 
 #include "openexr_compression.h"
 
+struct CodestreamChannelInfo {
+    int file_index;
+    size_t raster_line_offset;
+};
+
 bool
 make_channel_map (
-    int channel_count, exr_coding_channel_info_t* channels, std::vector<int>& cs_to_file_ch);
+    int channel_count, exr_coding_channel_info_t* channels, std::vector<CodestreamChannelInfo>& cs_to_file_ch);
 
 #endif /* OPENEXR_PRIVATE_HT_COMMON_H */
