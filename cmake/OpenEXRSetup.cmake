@@ -307,11 +307,15 @@ message(STATUS "Fetching OpenJPH")
 include(FetchContent)
 FetchContent_Declare(
   openjph
-  GIT_REPOSITORY https://github.com/aous72/OpenJPH
-  GIT_TAG        0.18.2
+  GIT_REPOSITORY https://github.com/palemieux/OpenJPH
+  GIT_TAG        feature/install-fix-openexr
 )
 
 FetchContent_MakeAvailable(openjph)
+install(
+ TARGETS openjph
+ EXPORT OpenEXR
+)
 set_property(DIRECTORY ${openjph_SOURCE_DIR} PROPERTY OJPH_ENABLE_TIFF_SUPPORT OFF)
 set_property(DIRECTORY ${openjph_SOURCE_DIR} PROPERTY OJPH_BUILD_TESTS OFF)
 set_property(DIRECTORY ${openjph_SOURCE_DIR} PROPERTY OJPH_BUILD_EXECUTABLES OFF)
