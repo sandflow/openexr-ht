@@ -191,6 +191,7 @@ cc_library(
         "src/lib/OpenEXRCore/internal_float_vector.h",
         "src/lib/OpenEXRCore/internal_ht.cpp",
         "src/lib/OpenEXRCore/internal_htk.cpp",
+        "src/lib/OpenEXRCore/internal_ht_common.h",
         "src/lib/OpenEXRCore/internal_ht_common.cpp",
         "src/lib/OpenEXRCore/internal_huf.c",
         "src/lib/OpenEXRCore/internal_huf.h",
