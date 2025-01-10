@@ -178,9 +178,7 @@ lib/libOpenEXR-$MAJOR_$MINOR.a
 lib/libOpenEXRCore-$MAJOR_$MINOR.a
 lib/libOpenEXRUtil-$MAJOR_$MINOR.a
 lib/pkgconfig/OpenEXR.pc
-lib/libopenjph.0.18.2.dylib
-lib/libopenjph.0.18.dylib
-lib/libopenjph.dylib
+lib/libopenjph.a
 lib/pkgconfig/openjph.pc
 share/doc/OpenEXR/examples/deepExamples.cpp
 share/doc/OpenEXR/examples/deepExamples.h
