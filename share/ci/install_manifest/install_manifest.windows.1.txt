@@ -4,6 +4,7 @@ bin/IlmThread-$MAJOR_$MINOR.dll
 bin/OpenEXR-$MAJOR_$MINOR.dll
 bin/OpenEXRCore-$MAJOR_$MINOR.dll
 bin/OpenEXRUtil-$MAJOR_$MINOR.dll
+bin/openjph.0.18.dll
 bin/exr2aces.exe
 bin/exrenvmap.exe
 bin/exrheader.exe
@@ -183,7 +184,6 @@ lib/cmake/OpenEXR/OpenEXRConfigVersion.cmake
 lib/cmake/OpenEXR/OpenEXRTargets-release.cmake
 lib/cmake/OpenEXR/OpenEXRTargets.cmake
 lib/pkgconfig/OpenEXR.pc
-bin/openjph.0.18.dll
 lib/openjph.0.18.lib
 lib/pkgconfig/openjph.pc
 share/doc/OpenEXR/examples/deepExamples.cpp
