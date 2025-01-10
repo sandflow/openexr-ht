@@ -5,6 +5,7 @@ bin/Imath-3_2.dll
 bin/OpenEXR-$MAJOR_$MINOR.dll
 bin/OpenEXRCore-$MAJOR_$MINOR.dll
 bin/OpenEXRUtil-$MAJOR_$MINOR.dll
+bin/openjph.0.18.dll
 bin/exr2aces.exe
 bin/exrenvmap.exe
 bin/exrheader.exe
@@ -225,6 +226,8 @@ lib/cmake/OpenEXR/OpenEXRTargets-release.cmake
 lib/cmake/OpenEXR/OpenEXRTargets.cmake
 lib/pkgconfig/Imath.pc
 lib/pkgconfig/OpenEXR.pc
+lib/openjph.0.18.lib
+lib/pkgconfig/openjph.pc
 share/doc/OpenEXR/examples/deepExamples.cpp
 share/doc/OpenEXR/examples/deepExamples.h
 share/doc/OpenEXR/examples/deepTiledExamples.cpp

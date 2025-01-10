@@ -266,6 +266,7 @@ cc_library(
     visibility = ["//visibility:public"],
     deps = [
         "@imath",
+        "@openjph",
         "@libdeflate//:deflate",
     ],
 )
@@ -508,6 +509,7 @@ cc_library(
         ":IlmThread",
         ":OpenEXRCore",
         "@imath",
+        "@openjph"
     ],
 )
 
