@@ -3,17 +3,9 @@
 ** Copyright Contributors to the OpenEXR Project.
 */
 
+#include <limits>
+#include <string>
 #include <fstream>
-
-#include "internal_compress.h"
-#include "internal_decompress.h"
-
-#include "internal_coding.h"
-#include "internal_structs.h"
-
-#include <limits.h>
-#include <stdlib.h>
-#include <string.h>
 
 #include <ojph_arch.h>
 #include <ojph_file.h>
@@ -21,7 +13,8 @@
 #include <ojph_mem.h>
 #include <ojph_codestream.h>
 
-#include "openexr_compression.h"
+#include "openexr_decode.h"
+#include "openexr_encode.h"
 #include "internal_ht_common.h"
 
 extern "C" exr_result_t

@@ -4,17 +4,8 @@
 */
 
 #include "internal_ht_common.h"
-
-#include "internal_compress.h"
-#include "internal_decompress.h"
-
-#include "internal_coding.h"
-#include "internal_structs.h"
-
 #include <vector>
 #include <string>
-
-#include "openexr_compression.h"
 #include <cassert>
 
 bool
