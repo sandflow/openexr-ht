@@ -7,6 +7,7 @@
 #define OPENEXR_PRIVATE_HT_COMMON_H
 
 #include <vector>
+#include <stdlib.h>
 #include "openexr_coding.h"
 
 struct CodestreamChannelInfo {
