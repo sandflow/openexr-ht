@@ -193,9 +193,9 @@ lib64/libOpenEXRUtil-$MAJOR_$MINOR_d.so.$SOVERSION.$MAJOR.$MINOR.0
 lib64/libOpenEXRUtil_d.so
 lib64/libOpenEXR_d.so
 lib64/pkgconfig/OpenEXR.pc
-lib64/libopenjph.so
-lib64/libopenjph.so.0.18
-lib64/libopenjph.so.0.18.2
+lib64/libopenjph_d.so
+lib64/libopenjph_d.so.0.18
+lib64/libopenjph_d.so.0.18.2
 lib64/pkgconfig/openjph.pc
 share/doc/OpenEXR/examples/deepExamples.cpp
 share/doc/OpenEXR/examples/deepExamples.h
