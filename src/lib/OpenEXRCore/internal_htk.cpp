@@ -3,19 +3,18 @@
 ** Copyright Contributors to the OpenEXR Project.
 */
 
-#include "internal_compress.h"
-#include "internal_decompress.h"
-
-#include "internal_coding.h"
-#include "internal_structs.h"
-
-#include "internal_ht_common.h"
-
-#include <limits.h>
+#include <limits>
 #include <stdlib.h>
-#include <string.h>
+#include <string>
 #include <vector>
 #include <string>
+
+#include "openexr_decode.h"
+#include "openexr_encode.h"
+#include "internal_decompress.h"
+#include "internal_compress.h"
+#include "internal_ht_common.h"
+
 
 #if 0
 
