@@ -314,6 +314,7 @@ FetchContent_Declare(
 set(OJPH_BUILD_TESTS OFF)
 set(OJPH_ENABLE_TIFF_SUPPORT OFF)
 set(OJPH_BUILD_EXECUTABLES OFF)
+set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 FetchContent_MakeAvailable(openjph)
 install(
  TARGETS openjph
