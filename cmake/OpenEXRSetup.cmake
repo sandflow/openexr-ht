@@ -311,6 +311,9 @@ FetchContent_Declare(
   GIT_TAG        feature/install-fix-openexr
 )
 
+set(OJPH_BUILD_TESTS OFF)
+set(OJPH_ENABLE_TIFF_SUPPORT OFF)
+set(OJPH_BUILD_EXECUTABLES OFF)
 FetchContent_MakeAvailable(openjph)
 install(
  TARGETS openjph
@@ -322,7 +325,6 @@ install(
   PUBLIC_HEADER
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${OPENEXR_OUTPUT_SUBDIR}
 )
-set_target_properties(openjph PROPERTIES OJPH_ENABLE_TIFF_SUPPORT OFF OJPH_BUILD_TESTS OFF OJPH_BUILD_EXECUTABLES OFF)
 
 #######################################
 # Get KDU
