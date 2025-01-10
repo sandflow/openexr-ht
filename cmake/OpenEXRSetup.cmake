@@ -325,6 +325,9 @@ install(
   PUBLIC_HEADER
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${OPENEXR_OUTPUT_SUBDIR}
 )
+set_target_properties(openjph PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
 
 #######################################
 # Get KDU
