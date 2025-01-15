@@ -194,9 +194,9 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
     for (ojph::ui32 c = 0; c < encode->channel_count; c++)
     {
         int file_c = cs_to_file_ch[c].file_index;
-        nlt.set_type3_transformation (
-            c, encode->channels[file_c].data_type != EXR_PIXEL_UINT);
-
+        if (encode->channels[file_c].data_type != EXR_PIXEL_UINT)
+            nlt.set_nonlinear_transform (
+                c, ojph::param_nlt::nonlinearity::OJPH_NLT_BINARY_COMPLEMENT_NLT);
         siz.set_component (
             c,
             ojph::point (
