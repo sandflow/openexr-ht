@@ -307,8 +307,8 @@ message(STATUS "Fetching OpenJPH")
 include(FetchContent)
 FetchContent_Declare(
   openjph
-  GIT_REPOSITORY https://github.com/palemieux/OpenJPH
-  GIT_TAG        feature/install-fix-openexr
+  GIT_REPOSITORY https://github.com/aous72/OpenJPH
+  GIT_TAG        supporting_differing_components
 )
 
 set(OJPH_BUILD_TESTS OFF CACHE BOOL "" FORCE)
