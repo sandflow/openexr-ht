@@ -192,8 +192,8 @@ include/openjph/ojph_mem.h
 include/openjph/ojph_message.h
 include/openjph/ojph_params.h
 include/openjph/ojph_version.h
-lib/libopenjph.0.18.2.dylib
-lib/libopenjph.0.18.dylib
+lib/libopenjph.0.19.0.dylib
+lib/libopenjph.0.19.dylib
 lib/libopenjph.dylib
 lib/pkgconfig/openjph.pc
 lib/cmake/Imath/ImathConfig.cmake

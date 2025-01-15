@@ -195,7 +195,7 @@ lib64/libOpenEXRUtil.so
 lib64/pkgconfig/OpenEXR.pc
 lib64/libopenjph.so
 lib64/libopenjph.so.0.18
-lib64/libopenjph.so.0.18.2
+lib64/libopenjph.so.0.19.0
 lib64/pkgconfig/openjph.pc
 share/doc/OpenEXR/examples/deepExamples.cpp
 share/doc/OpenEXR/examples/deepExamples.h
