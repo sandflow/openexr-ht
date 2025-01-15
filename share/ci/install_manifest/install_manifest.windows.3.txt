@@ -219,7 +219,7 @@ lib/cmake/OpenEXR/OpenEXRTargets-release.cmake
 lib/cmake/OpenEXR/OpenEXRTargets.cmake
 lib/pkgconfig/Imath.pc
 lib/pkgconfig/OpenEXR.pc
-lib/openjph.0.18.lib
+lib/openjph.0.19.lib
 lib/pkgconfig/openjph.pc
 share/doc/OpenEXR/examples/deepExamples.cpp
 share/doc/OpenEXR/examples/deepExamples.h
