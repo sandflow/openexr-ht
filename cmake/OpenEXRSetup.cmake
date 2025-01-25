@@ -299,35 +299,52 @@ endif()
 
 
 #######################################
-# Get OpenJPH
+# Find or download OpenJPH
 #######################################
 
-message(STATUS "Fetching OpenJPH")
+message(STATUS "Locating OpenJPH")
 
-include(FetchContent)
-FetchContent_Declare(
-  openjph
-  GIT_REPOSITORY https://github.com/aous72/OpenJPH
-  GIT_TAG        supporting_differing_components
-)
+option(OPENEXR_OJPH_USE_FINDPACKAGE "Use find_package instead of downloading OpenJPH from a git repo" OFF)
+set(OPENEXR_OJPH_REPO "https://github.com/aous72/OpenJPH.git" CACHE STRING "OpenJPH Git repo URI")
+set(OPENEXR_OJPH_TAG "supporting_differing_components" CACHE STRING "OpenJPH Git repo tag")
 
-set(OJPH_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(OJPH_ENABLE_TIFF_SUPPORT OFF CACHE BOOL "" FORCE)
-set(OJPH_BUILD_EXECUTABLES OFF CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(openjph)
-install(
- TARGETS openjph
- EXPORT ${PROJECT_NAME}
-  RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-  LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-  INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
-  PUBLIC_HEADER
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${OPENEXR_OUTPUT_SUBDIR}
-)
-set_target_properties(openjph PROPERTIES
-  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-)
+if (NOT (OPENJPH_INCLUDE_DIRS AND OPENJPH_LIBRARIES))
+  if (OPENEXR_OJPH_USE_FINDPACKAGE)
+    find_package(openjph 0.19)
+  else()
+    include(FetchContent)
+    FetchContent_Declare(
+      openjph
+      GIT_REPOSITORY ${OPENEXR_OJPH_REPO}
+      GIT_TAG        ${OPENEXR_OJPH_TAG}
+    )
+
+    set(OJPH_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(OJPH_ENABLE_TIFF_SUPPORT OFF CACHE BOOL "" FORCE)
+    set(OJPH_BUILD_EXECUTABLES OFF CACHE BOOL "" FORCE)
+    FetchContent_MakeAvailable(openjph)
+    install(
+    TARGETS openjph
+    EXPORT ${PROJECT_NAME}
+      RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+      LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+      INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+      PUBLIC_HEADER
+        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/${OPENEXR_OUTPUT_SUBDIR}
+    )
+    set_target_properties(openjph PROPERTIES
+      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+    )
+
+    set(OPENJPH_INCLUDE_DIRS "${openjph_SOURCE_DIR}/src/core/common")
+    set(OPENJPH_LIBRARIES openjph)
+  endif()
+endif()
+
+if (NOT (OPENJPH_INCLUDE_DIRS AND OPENJPH_LIBRARIES))
+  message(SEND_ERROR "OpenJPH could not be found.")
+endif()
 
 #######################################
 # Find or install Imath

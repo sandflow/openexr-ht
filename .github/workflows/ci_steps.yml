@@ -47,6 +47,8 @@ on:
         type: string
       OPENEXR_FORCE_INTERNAL_DEFLATE:
         type: string
+      OPENEXR_FORCE_INTERNAL_OPENJPH:
+        type: string
       BUILD_TESTING:
         type: string
       namespace:
@@ -84,6 +86,11 @@ jobs:
         run: share/ci/scripts/install_libdeflate.sh master
         shell: bash
 
+      - name: Install OpenJPH
+        # Pre-install OpenJPH so the builds validate finding the external installation
+        if: ${{ inputs.OPENEXR_FORCE_INTERNAL_OPENJPH == 'OFF' }}
+        run: share/ci/scripts/install_openjph.sh master
+
       - name: Install help2man
         # TODO: this could go in the ASWF Linux docker
         # container. Also, it doesn't currently work for Windows, so
@@ -113,6 +120,7 @@ jobs:
                 -DOPENEXR_BUILD_TOOLS=${{ inputs.OPENEXR_BUILD_TOOLS }} \
                 -DOPENEXR_FORCE_INTERNAL_IMATH=${{ inputs.OPENEXR_FORCE_INTERNAL_IMATH }} \
                 -DOPENEXR_FORCE_INTERNAL_DEFLATE=${{ inputs.OPENEXR_FORCE_INTERNAL_DEFLATE }} \
+                -DOPENEXR_OJPH_USE_FINDPACKAGE=${{ ! inputs.OPENEXR_FORCE_INTERNAL_OPENJPH }} \
                 -DBUILD_TESTING=${{ inputs.BUILD_TESTING }} \
                 -DOPENEXR_RUN_FUZZ_TESTS=OFF \
                 -DCMAKE_VERBOSE_MAKEFILE=ON"
