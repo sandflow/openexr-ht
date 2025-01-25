@@ -311,6 +311,8 @@ set(OPENEXR_OJPH_TAG "supporting_differing_components" CACHE STRING "OpenJPH Git
 if (NOT (OPENJPH_INCLUDE_DIRS AND OPENJPH_LIBRARIES))
   if (OPENEXR_OJPH_USE_FINDPACKAGE)
     find_package(openjph 0.19)
+
+    message(STATUS "Using OpenJPH at ${OPENJPH_LIBRARIES}.")
   else()
     include(FetchContent)
     FetchContent_Declare(
@@ -339,6 +341,8 @@ if (NOT (OPENJPH_INCLUDE_DIRS AND OPENJPH_LIBRARIES))
 
     set(OPENJPH_INCLUDE_DIRS "${openjph_SOURCE_DIR}/src/core/common")
     set(OPENJPH_LIBRARIES openjph)
+
+    message(STATUS "Building OpenJPH from ${OPENEXR_OJPH_REPO}.")
   endif()
 endif()
 
