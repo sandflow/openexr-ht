@@ -17,7 +17,7 @@ cd OpenJPH
 
 git checkout ${TAG}
 
-mkdir build
+mkdir -p build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 $SUDO cmake --build . \
