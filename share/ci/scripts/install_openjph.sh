@@ -21,7 +21,7 @@ mkdir -p build
 cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make
-$SUDO cmake --install
+$SUDO cmake --install .
 
 cd ../..
 rm -rf OpenJPH
