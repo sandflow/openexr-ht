@@ -12,7 +12,7 @@ else
     SUDO="sudo"
 fi
 
-git clone https://github.com/aous72/OpenJPH.git
+git clone -b add-export https://github.com/palemieux/OpenJPH.git
 cd OpenJPH
 
 git checkout ${TAG}
