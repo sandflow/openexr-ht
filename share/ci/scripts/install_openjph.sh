@@ -15,7 +15,7 @@ fi
 git clone -b add-export https://github.com/palemieux/OpenJPH.git
 cd OpenJPH
 
-git checkout ${TAG}
+# git checkout ${TAG}
 
 mkdir -p build
 cd build
