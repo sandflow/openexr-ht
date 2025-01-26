@@ -171,6 +171,9 @@ lib/cmake/OpenEXR/OpenEXRConfig.cmake
 lib/cmake/OpenEXR/OpenEXRConfigVersion.cmake
 lib/cmake/OpenEXR/OpenEXRTargets-release.cmake
 lib/cmake/OpenEXR/OpenEXRTargets.cmake
+lib/cmake/openjph/openjph-config-release.cmake
+lib/cmake/openjph/openjph-config.cmake
+lib/cmake/openjph/openjph-configVersion.cmake
 lib/libIex-$MAJOR_$MINOR.$SOVERSION.$MAJOR.$MINOR.0.dylib
 lib/libIex-$MAJOR_$MINOR.$SOVERSION.dylib
 lib/libIex-$MAJOR_$MINOR.dylib

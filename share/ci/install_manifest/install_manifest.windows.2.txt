@@ -182,6 +182,10 @@ lib/cmake/OpenEXR/OpenEXRConfig.cmake
 lib/cmake/OpenEXR/OpenEXRConfigVersion.cmake
 lib/cmake/OpenEXR/OpenEXRTargets-debug.cmake
 lib/cmake/OpenEXR/OpenEXRTargets.cmake
+lib/cmake/openjph/openjph-config-release.cmake
+lib/cmake/openjph/openjph-config.cmake
+lib/cmake/openjph/openjph-configVersion.cmake
+lib/pkgconfig/Imath.pc
 lib/pkgconfig/OpenEXR.pc
 lib/openjph.0.19_d.lib
 lib/pkgconfig/openjph.pc
