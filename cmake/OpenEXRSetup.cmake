@@ -310,7 +310,22 @@ set(OPENEXR_OJPH_TAG "add-export" CACHE STRING "OpenJPH Git repo tag")
 
 if (OPENEXR_OJPH_USE_FINDPACKAGE)
   find_package(openjph 0.19 REQUIRED)
-  message(STATUS "Found OpenJPH locally.")
+
+  if(openjph_FOUND)
+    message(STATUS "Found OpenJPH using find_package.")
+    set(EXR_OPENJPH_LIB openjph)
+  else()
+    # If not found, try pkgconfig
+    find_package(PkgConfig)
+    if(PKG_CONFIG_FOUND)
+      include(FindPkgConfig)
+      pkg_check_modules(openjph IMPORTED_TARGET GLOBAL openjph)
+      if(openjph_FOUND)
+        set(EXR_OPENJPH_LIB PkgConfig::openjph)
+        message(STATUS "Found OpenJPH using PkgConfig at ${deflate_LINK_LIBRARIES}")
+      endif()
+    endif()
+  endif()
 else()
   include(FetchContent)
   FetchContent_Declare(
@@ -331,6 +346,8 @@ else()
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
   )
   include_directories("${openjph_SOURCE_DIR}/src/core/common")
+
+  set(EXR_OPENJPH_LIB openjph)
 
   message(STATUS "Building OpenJPH from ${OPENEXR_OJPH_REPO}.")
 endif()
