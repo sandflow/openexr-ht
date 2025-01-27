@@ -4,7 +4,6 @@ bin/IlmThread-$MAJOR_$MINOR.dll
 bin/OpenEXR-$MAJOR_$MINOR.dll
 bin/OpenEXRCore-$MAJOR_$MINOR.dll
 bin/OpenEXRUtil-$MAJOR_$MINOR.dll
-bin/openjph.0.19.dll
 bin/exr2aces.exe
 bin/exrenvmap.exe
 bin/exrheader.exe
