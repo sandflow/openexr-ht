@@ -19,10 +19,8 @@ cd OpenJPH
 
 cd build
 cmake -DOJPH_ENABLE_TIFF_SUPPORT=OFF -DCMAKE_BUILD_TYPE=Release ..
-$SUDO cmake --build . \
-      --target install \
-      --config Release \
-      --parallel 2
+cmake --build . --config Release
+$SUDO cmake --install
 
 cd ../..
 rm -rf OpenJPH
