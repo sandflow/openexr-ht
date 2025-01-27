@@ -18,7 +18,7 @@ cd OpenJPH
 # git checkout ${TAG}
 
 cd build
-cmake -DCMAKE_BUILD_TYPE=Release ..
+cmake -DOJPH_ENABLE_TIFF_SUPPORT=OFF -DCMAKE_BUILD_TYPE=Release ..
 $SUDO cmake --build . \
       --target install \
       --config Release \
