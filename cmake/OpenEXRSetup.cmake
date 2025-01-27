@@ -309,7 +309,7 @@ set(OPENEXR_OJPH_REPO "https://github.com/palemieux/OpenJPH.git" CACHE STRING "O
 set(OPENEXR_OJPH_TAG "add-export" CACHE STRING "OpenJPH Git repo tag")
 
 if (OPENEXR_OJPH_USE_FINDPACKAGE)
-  find_package(openjph 0.19 REQUIRED)
+  find_package(openjph 0.19 QUIET)
 
   if(openjph_FOUND)
     message(STATUS "Found OpenJPH using find_package.")
@@ -323,6 +323,8 @@ if (OPENEXR_OJPH_USE_FINDPACKAGE)
       if(openjph_FOUND)
         set(EXR_OPENJPH_LIB PkgConfig::openjph)
         message(STATUS "Found OpenJPH using PkgConfig at ${deflate_LINK_LIBRARIES}")
+      else()
+        message(ERROR "Failed to find OpenJPH using find_package and PkgConfig.")
       endif()
     endif()
   endif()
