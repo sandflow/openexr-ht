@@ -323,8 +323,6 @@ if (OPENEXR_OJPH_USE_FINDPACKAGE)
       if(openjph_FOUND)
         set(EXR_OPENJPH_LIB PkgConfig::openjph)
         message(STATUS "Found OpenJPH using PkgConfig at ${deflate_LINK_LIBRARIES}")
-      else()
-        message(ERROR "Failed to find OpenJPH using find_package and PkgConfig.")
       endif()
     endif()
   endif()
@@ -354,6 +352,9 @@ else()
   message(STATUS "Building OpenJPH from ${OPENEXR_OJPH_REPO}.")
 endif()
 
+if (NOT EXR_OPENJPH_LIB)
+  message(ERROR "Failed to find OpenJPH.")
+endif()
 
 #######################################
 # Find or install Imath
