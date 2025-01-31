@@ -172,7 +172,7 @@ jobs:
         # When building against external Imath/libdeflate shared objects, the tests need PATH to include the dll's.
         if: contains(inputs.os, 'windows')
         run: |
-          echo "$PATH;C:/Program Files (x86)/Imath/bin;C:/Program Files (x86)/Imath/lib;C:/Program Files (x86)/libdeflate/bin;C:/Program Files (x86)/libdeflate/lib" >> $GITHUB_PATH
+          echo "$PATH;C:/Program Files (x86)/openjph/lib/;C:/Program Files (x86)/openjph/bin;C:/Program Files (x86)/Imath/bin;C:/Program Files (x86)/Imath/lib;C:/Program Files (x86)/libdeflate/bin;C:/Program Files (x86)/libdeflate/lib" >> $GITHUB_PATH
         shell: bash
 
       - name: Test
