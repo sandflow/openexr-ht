@@ -90,6 +90,7 @@ jobs:
         # Pre-install OpenJPH so the builds validate finding the external installation
         if: ${{ inputs.OPENEXR_FORCE_INTERNAL_OPENJPH == 'OFF' }}
         run: share/ci/scripts/install_openjph.sh master
+        shell: bash
 
       - name: Install help2man
         # TODO: this could go in the ASWF Linux docker
