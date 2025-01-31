@@ -161,6 +161,7 @@ jobs:
         shell: bash
 
       - name: Upload install_manifest.txt
+        # Per Cary Phillips on 20250131 until further notics
         if: false
         # Upload the manifest to make it possible to download for inspection and debugging
         uses: actions/upload-artifact@v4
