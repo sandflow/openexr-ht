@@ -18,9 +18,11 @@ cd OpenJPH
 # git checkout ${TAG}
 
 cd build
-cmake -DOJPH_ENABLE_TIFF_SUPPORT=OFF -DCMAKE_BUILD_TYPE=Release ..
-cmake --build . --config Release
-$SUDO cmake --install .
+$SUDO cmake --build . \
+      --target install \
+      --config Release \
+      --parallel 2 \
+      -DOJPH_ENABLE_TIFF_SUPPORT=OFF
 
 cd ../..
 rm -rf OpenJPH
