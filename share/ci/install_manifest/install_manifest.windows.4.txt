@@ -186,7 +186,7 @@ lib/cmake/openjph/openjph-config.cmake
 lib/cmake/openjph/openjph-configVersion.cmake
 lib/pkgconfig/Imath.pc
 lib/pkgconfig/OpenEXR.pc
-lib/openjph.0.19.lib
+lib/openjph.0.20.lib
 lib/pkgconfig/openjph.pc
 share/doc/OpenEXR/examples/deepExamples.cpp
 share/doc/OpenEXR/examples/deepExamples.h

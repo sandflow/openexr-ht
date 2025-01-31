@@ -310,7 +310,7 @@ set(OPENEXR_OJPH_REPO "https://github.com/palemieux/OpenJPH.git" CACHE STRING "O
 set(OPENEXR_OJPH_TAG "add-export" CACHE STRING "OpenJPH Git repo tag")
 
 if (NOT OPENEXR_FORCE_INTERNAL_OPENJPH)
-  find_package(openjph 0.19 QUIET)
+  find_package(openjph 0.20 QUIET)
 
   if(openjph_FOUND)
     message(STATUS "Found OpenJPH using find_package.")

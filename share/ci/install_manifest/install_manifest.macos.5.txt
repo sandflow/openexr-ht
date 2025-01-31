@@ -227,7 +227,7 @@ include/openjph/ojph_version.h
 lib/cmake/openjph/openjph-config-release.cmake
 lib/cmake/openjph/openjph-config.cmake
 lib/cmake/openjph/openjph-configVersion.cmake
-lib/libopenjph.0.19.1.dylib
-lib/libopenjph.0.19.dylib
+lib/libopenjph.0.20.0.dylib
+lib/libopenjph.0.20.dylib
 lib/libopenjph.dylib
 lib/pkgconfig/openjph.pc
