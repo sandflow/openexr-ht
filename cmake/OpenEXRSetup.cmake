@@ -304,11 +304,12 @@ endif()
 
 message(STATUS "Locating OpenJPH")
 
-option(OPENEXR_OJPH_USE_FINDPACKAGE "Use find_package instead of downloading OpenJPH from a git repo" OFF)
+option(OPENEXR_FORCE_INTERNAL_OPENJPH "Force downloading OpenJPH from a git repo" OFF)
+
 set(OPENEXR_OJPH_REPO "https://github.com/palemieux/OpenJPH.git" CACHE STRING "OpenJPH Git repo URI")
 set(OPENEXR_OJPH_TAG "add-export" CACHE STRING "OpenJPH Git repo tag")
 
-if (OPENEXR_OJPH_USE_FINDPACKAGE)
+if (NOT OPENEXR_FORCE_INTERNAL_OPENJPH)
   find_package(openjph 0.19 QUIET)
 
   if(openjph_FOUND)
@@ -326,7 +327,9 @@ if (OPENEXR_OJPH_USE_FINDPACKAGE)
       endif()
     endif()
   endif()
-else()
+endif()
+
+if(NOT EXR_OPENJPH_LIB)
   include(FetchContent)
   FetchContent_Declare(
     openjph
