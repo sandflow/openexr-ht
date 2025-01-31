@@ -182,7 +182,7 @@ lib/libOpenEXRUtil-$MAJOR_$MINOR.$SOVERSION.dylib
 lib/libOpenEXRUtil-$MAJOR_$MINOR.dylib
 lib/libOpenEXRUtil.dylib
 lib/pkgconfig/OpenEXR.pc
-lib/libopenjph.0.19.0.dylib
+lib/libopenjph.0.19.1.dylib
 lib/libopenjph.0.19.dylib
 lib/libopenjph.dylib
 lib/pkgconfig/openjph.pc
