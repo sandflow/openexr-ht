@@ -160,15 +160,6 @@ jobs:
           sort _build/install_manifest.txt | sed -e "s:^.*/_install/::" >> "_build/$INSTALL_MANIFEST"
         shell: bash
 
-      - name: Upload install_manifest.txt
-        # Per Cary Phillips on 20250131 until further notics
-        if: false
-        # Upload the manifest to make it possible to download for inspection and debugging
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ env.INSTALL_MANIFEST }}
-          path: _build/${{ env.INSTALL_MANIFEST }}
-
       - name: Validate install
         if: ${{ inputs.validate_install == 'ON' }}
         # Validate that the build has installed the proper files by comparing against the appropriate reference manifest
