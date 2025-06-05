@@ -177,3 +177,96 @@ make_channel_map (
 
     return isRGB;
 }
+
+uint32_t
+MemoryReader::pull_uint32 ()
+{
+    if (this->end - this->cur < 4)
+        throw std::out_of_range ("Insufficient data to pull uint32_t");
+
+    uint32_t v = *this->cur++;
+    v          = (v << 8) + *this->cur++;
+    v          = (v << 8) + *this->cur++;
+    return (v << 8) + *cur++;
+}
+
+uint16_t
+MemoryReader::pull_uint16 ()
+{
+    if (this->end - this->cur < 2)
+        throw std::out_of_range ("Insufficient data to pull uint16_t");
+
+    uint32_t v = *cur++;
+    return (v << 8) + *cur++;
+}
+
+void
+MemoryWriter::push_uint32 (uint32_t value)
+{
+    if (this->end - this->cur < 4)
+        throw std::out_of_range ("Insufficient data to push uint32_t");
+
+    *this->cur++ = (value >> 24) & 0xFF;
+    *this->cur++ = (value >> 16) & 0xFF;
+    *this->cur++ = (value >> 8) & 0xFF;
+    *this->cur++ = value & 0xFF;
+}
+
+void
+MemoryWriter::push_uint16 (uint16_t value)
+{
+    if (this->end - this->cur < 2)
+        throw std::out_of_range ("Insufficient data to push uint32_t");
+
+    *this->cur++ = (value >> 8) & 0xFF;
+    *this->cur++ = value & 0xFF;
+}
+
+constexpr uint16_t HEADER_MARKER = 'H' * 256 + 'T';
+constexpr uint16_t HEADER_SZ = 6;
+
+size_t
+write_header (
+    uint8_t*                                  buffer,
+    size_t                                    max_sz,
+    const std::vector<CodestreamChannelInfo>& map)
+{
+    MemoryWriter       payload (buffer + HEADER_SZ, max_sz - HEADER_SZ);
+    payload.push_uint16 (map.size ());
+    for (size_t i = 0; i < map.size (); i++)
+    {
+        payload.push_uint16 (map.at (i).file_index);
+    }
+
+    MemoryWriter header (buffer, max_sz);
+    header.push_uint16 (HEADER_MARKER);
+    header.push_uint32 (payload.get_size ());
+
+    return header.get_size () + payload.get_size ();
+}
+
+void
+read_header (
+    void*                               buffer,
+    size_t                              max_sz,
+    size_t&                             length,
+    std::vector<CodestreamChannelInfo>& map)
+{
+    MemoryReader header ((uint8_t*) buffer, max_sz);
+    if (header.pull_uint16 () != HEADER_MARKER)
+        throw std::runtime_error (
+            "HTJ2K chunk header missing does not start with magic number.");
+
+    length = header.pull_uint32 ();
+
+    if (length < 2)
+        throw std::runtime_error ("Error while reading the channel map");
+
+    map.resize (header.pull_uint16 ());
+    for (size_t i = 0; i < map.size (); i++)
+    {
+        map.at (i).file_index = header.pull_uint16 ();
+    }
+
+    length += HEADER_SZ;
+}

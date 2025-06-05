@@ -318,6 +318,22 @@ endif()
 
 
 #######################################
+# Get KDU
+#######################################
+
+message(STATUS "Fetching KDU")
+find_path(KDU_INCLUDE_DIR kdu_args.h PATH_SUFFIXES kakadu kdu)
+find_library(KDU_LIBRARY NAMES kdu_a84R PATH_SUFFIXES kakadu kdu)
+
+if(NOT(KDU_INCLUDE_DIR) OR NOT(KDU_LIBRARY))
+  message("Kakadu SDK not found: ${KDU_LIBRARY} and ${KDU_INCLUDE_DIR}.")
+  set(KDU_INCLUDE_DIR CACHE PATH "" FORCE)
+  set(KDU_LIBRARY CACHE PATH "" FORCE)
+else()
+  message("Kakadu SDK found: ${KDU_LIBRARY} and ${KDU_INCLUDE_DIR}.")
+endif()
+
+#######################################
 # Find or download OpenJPH
 #######################################
 
