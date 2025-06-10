@@ -149,7 +149,7 @@ read_header (
     }
 }
 
-  class staticmem_outfile : public ojph::outfile_base
+class staticmem_outfile : public ojph::outfile_base
   {
   public:
     /**  A constructor */
@@ -200,7 +200,7 @@ read_header (
 
         size_t needed_size = (size_t) tell () + sz; //needed size
         if (needed_size > this->max_size) {
-            return 0;
+            throw std::range_error("Buffer size exceeded");
         }
 
         // copy bytes into buffer and adjust cur_ptr
@@ -222,7 +222,7 @@ read_header (
      *  @brief Call this function to change write pointer location; the 
      *         function can expand file storage.
      *
-     *  @return 0 on success, non-zero otherwise (not used).
+     *  @return 0 on success, non-zero otherwise.
      */
     int seek (ojph::si64 offset, enum outfile_base::seek origin) override
     {
@@ -237,9 +237,6 @@ read_header (
             assert (0);
             return -1;
         }
-
-        if (offset >= this->max_size)
-            return -1;
 
         cur_ptr = buf + offset;
         return 0;
@@ -525,110 +522,113 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
     staticmem_outfile output;
     output.open ( ((uint8_t*) encode->compressed_buffer) + header_sz, encode->packed_bytes - header_sz);
 
-    cs.write_headers (&output);
+        try {
+        cs.write_headers (&output);
 
-    ojph::ui32      next_comp = 0;
-    ojph::line_buf* cur_line  = cs.exchange (NULL, next_comp);
+        ojph::ui32      next_comp = 0;
+        ojph::line_buf* cur_line  = cs.exchange (NULL, next_comp);
 
-    if (cs.is_planar ())
-    {
-        for (ojph::ui32 c = 0; c < encode->channel_count; c++)
-        {
-            if (encode->channels[c].height == 0) continue;
-
-            const uint8_t* line_pixels =
-                static_cast<const uint8_t*> (encode->packed_buffer);
-            int file_c = cs_to_file_ch[c].file_index;
-
-            for (int64_t y = encode->chunk.start_y;
-                 y < image_height + encode->chunk.start_y;
-                 y++)
-            {
-                for (ojph::ui32 line_c = 0; line_c < encode->channel_count;
-                     line_c++)
-                {
-
-                    if (y % encode->channels[line_c].y_samples != 0) continue;
-
-                    if (line_c == file_c)
-                    {
-                        if (encode->channels[file_c].data_type ==
-                            EXR_PIXEL_HALF)
-                        {
-                            int16_t* channel_pixels = (int16_t*) (line_pixels);
-                            for (uint32_t p = 0;
-                                 p < encode->channels[file_c].width;
-                                 p++)
-                            {
-                                cur_line->i32[p] = *channel_pixels++;
-                            }
-                        }
-                        else
-                        {
-                            int32_t* channel_pixels = (int32_t*) (line_pixels);
-                            for (uint32_t p = 0;
-                                 p < encode->channels[file_c].width;
-                                 p++)
-                            {
-                                cur_line->i32[p] = *channel_pixels++;
-                            }
-                        }
-
-                        assert (next_comp == c);
-                        cur_line = cs.exchange (cur_line, next_comp);
-                    }
-
-                    line_pixels += encode->channels[line_c].bytes_per_element *
-                                   encode->channels[line_c].width;
-                }
-            }
-        }
-    }
-    else
-    {
-        const uint8_t* line_pixels =
-            static_cast<const uint8_t*> (encode->packed_buffer);
-
-        assert (bpl * image_height == encode->packed_bytes);
-
-        for (int y = 0; y < image_height; y++)
+        if (cs.is_planar ())
         {
             for (ojph::ui32 c = 0; c < encode->channel_count; c++)
             {
+                if (encode->channels[c].height == 0) continue;
+
+                const uint8_t* line_pixels =
+                    static_cast<const uint8_t*> (encode->packed_buffer);
                 int file_c = cs_to_file_ch[c].file_index;
 
-                if (encode->channels[file_c].data_type == EXR_PIXEL_HALF)
+                for (int64_t y = encode->chunk.start_y;
+                    y < image_height + encode->chunk.start_y;
+                    y++)
                 {
-                    int16_t* channel_pixels =
-                        (int16_t*) (line_pixels + cs_to_file_ch[c].raster_line_offset);
-                    for (uint32_t p = 0; p < encode->channels[file_c].width;
-                         p++)
+                    for (ojph::ui32 line_c = 0; line_c < encode->channel_count;
+                        line_c++)
                     {
-                        cur_line->i32[p] = *channel_pixels++;
+
+                        if (y % encode->channels[line_c].y_samples != 0) continue;
+
+                        if (line_c == file_c)
+                        {
+                            if (encode->channels[file_c].data_type ==
+                                EXR_PIXEL_HALF)
+                            {
+                                int16_t* channel_pixels = (int16_t*) (line_pixels);
+                                for (uint32_t p = 0;
+                                    p < encode->channels[file_c].width;
+                                    p++)
+                                {
+                                    cur_line->i32[p] = *channel_pixels++;
+                                }
+                            }
+                            else
+                            {
+                                int32_t* channel_pixels = (int32_t*) (line_pixels);
+                                for (uint32_t p = 0;
+                                    p < encode->channels[file_c].width;
+                                    p++)
+                                {
+                                    cur_line->i32[p] = *channel_pixels++;
+                                }
+                            }
+
+                            assert (next_comp == c);
+                            cur_line = cs.exchange (cur_line, next_comp);
+                        }
+
+                        line_pixels += encode->channels[line_c].bytes_per_element *
+                                    encode->channels[line_c].width;
                     }
                 }
-                else
-                {
-                    int32_t* channel_pixels =
-                        (int32_t*) (line_pixels + cs_to_file_ch[c].raster_line_offset);
-                    for (uint32_t p = 0; p < encode->channels[file_c].width;
-                         p++)
-                    {
-                        cur_line->i32[p] = *channel_pixels++;
-                    }
-                }
-                assert (next_comp == c);
-                cur_line = cs.exchange (cur_line, next_comp);
             }
-            line_pixels += bpl;
         }
+        else
+        {
+            const uint8_t* line_pixels =
+                static_cast<const uint8_t*> (encode->packed_buffer);
+
+            assert (bpl * image_height == encode->packed_bytes);
+
+            for (int y = 0; y < image_height; y++)
+            {
+                for (ojph::ui32 c = 0; c < encode->channel_count; c++)
+                {
+                    int file_c = cs_to_file_ch[c].file_index;
+
+                    if (encode->channels[file_c].data_type == EXR_PIXEL_HALF)
+                    {
+                        int16_t* channel_pixels =
+                            (int16_t*) (line_pixels + cs_to_file_ch[c].raster_line_offset);
+                        for (uint32_t p = 0; p < encode->channels[file_c].width;
+                            p++)
+                        {
+                            cur_line->i32[p] = *channel_pixels++;
+                        }
+                    }
+                    else
+                    {
+                        int32_t* channel_pixels =
+                            (int32_t*) (line_pixels + cs_to_file_ch[c].raster_line_offset);
+                        for (uint32_t p = 0; p < encode->channels[file_c].width;
+                            p++)
+                        {
+                            cur_line->i32[p] = *channel_pixels++;
+                        }
+                    }
+                    assert (next_comp == c);
+                    cur_line = cs.exchange (cur_line, next_comp);
+                }
+                line_pixels += bpl;
+            }
+        }
+
+        cs.flush ();
+
+        assert (output.get_size () >= 0);
+        encode->compressed_bytes = output.get_size () + header_sz;
+    } catch (const std::range_error& e) {
+        encode->compressed_bytes = encode->packed_bytes;
     }
 
-    cs.flush ();
-
-    assert (output.get_size () >= 0);
-    encode->compressed_bytes = output.get_size () + header_sz;
-
-    /* encode->compressed_bytes = encode->packed_bytes; */
     return rv;
 }
