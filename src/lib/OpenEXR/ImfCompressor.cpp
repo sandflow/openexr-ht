@@ -19,7 +19,6 @@
 #include "ImfRleCompressor.h"
 #include "ImfZipCompressor.h"
 #include "ImfHTCompressor.h"
-#include "ImfHTKCompressor.h"
 
 OPENEXR_IMF_INTERNAL_NAMESPACE_SOURCE_ENTER
 
@@ -67,9 +66,7 @@ isValidCompression (Compression c)
         case DWAA_COMPRESSION:
         case DWAB_COMPRESSION:
         case HT_COMPRESSION:
-        case HT256_COMPRESSION:
-        case HTK_COMPRESSION:
-        case HTK256_COMPRESSION: return true;
+        case HT256_COMPRESSION: return true;
 
         default: return false;
     }
@@ -97,9 +94,7 @@ isValidDeepCompression (Compression c)
         case RLE_COMPRESSION:
         case ZIPS_COMPRESSION:
         case HT_COMPRESSION:
-        case HT256_COMPRESSION:
-        case HTK_COMPRESSION:
-        case HTK256_COMPRESSION: return true;
+        case HT256_COMPRESSION: return true;
         default: return false;
     }
 }
@@ -159,14 +154,6 @@ newCompressor (Compression c, size_t maxScanLineSize, const Header& hdr)
 
             return new HTCompressor (hdr, 256);
 
-        case HTK_COMPRESSION:
-
-            return new HTKCompressor (hdr);
-
-        case HTK256_COMPRESSION:
-
-            return new HTKCompressor (hdr, 256);
-
         default: return 0;
     }
 }
@@ -189,10 +176,8 @@ numLinesInBuffer (Compression comp)
         case B44A_COMPRESSION:
         case DWAA_COMPRESSION: return 32;
         case HT256_COMPRESSION:
-        case HTK256_COMPRESSION:
         case DWAB_COMPRESSION: return 256;
-        case HT_COMPRESSION:
-        case HTK_COMPRESSION: return 16000;
+        case HT_COMPRESSION: return 16000;
 
         default: throw IEX_NAMESPACE::ArgExc ("Unknown compression type");
     }

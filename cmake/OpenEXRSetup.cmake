@@ -260,18 +260,6 @@ set_property(DIRECTORY ${openjph_SOURCE_DIR} PROPERTY OJPH_BUILD_TESTS OFF)
 set_property(DIRECTORY ${openjph_SOURCE_DIR} PROPERTY OJPH_BUILD_EXECUTABLES OFF)
 
 #######################################
-# Get KDU
-#######################################
-
-message(STATUS "Fetching KDU")
-find_path(KDU_INCLUDE_DIR kdu_args.h PATH_SUFFIXES kakadu kdu)
-find_library(KDU_LIBRARY NAMES kdu_a84R PATH_SUFFIXES kakadu kdu)
-
-if(NOT(KDU_INCLUDE_DIR) OR NOT(KDU_LIBRARY))
-  message("Kakadu SDK not found: ${KDU_LIBRARY} and ${KDU_INCLUDE_DIR}.")
-endif()
-
-#######################################
 # Find or install Imath
 #######################################
 

@@ -548,9 +548,7 @@ MultiPartInputFile::Data::chunkOffsetReconstruction (
             switch (parts[i]->header.compression ())
             {
                 case HT_COMPRESSION:
-                case HTK_COMPRESSION: rowsizes[i] = 16000; break;
                 case HT256_COMPRESSION:
-                case HTK256_COMPRESSION:
                 case DWAB_COMPRESSION: rowsizes[i] = 256; break;
                 case PIZ_COMPRESSION:
                 case B44_COMPRESSION:
