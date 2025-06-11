@@ -149,6 +149,9 @@ read_header (
     }
 }
 
+/**
+ * OpenJPH output file that is backed by a fixed-size memory buffer
+ */
 class staticmem_outfile : public ojph::outfile_base
   {
   public:
