@@ -11,7 +11,7 @@
 #include "openexr_encode.h"
 #include "internal_ht_common.h"
 
-#ifdef KDU_AVAILABLE
+#if 1
 
 #include <iostream>
 
@@ -30,28 +30,54 @@ using namespace kdu_supp;
 class mem_compressed_target : public kdu_compressed_target
 {
 public:
-    mem_compressed_target () {}
+    mem_compressed_target (void* buf, size_t buf_size) {
+        this->max_size = buf_size;
+        this->used_size = 0;
+        this->buf = (uint8_t*) buf;
+        this->cur_ptr = this->buf;
+    }
 
     bool close ()
     {
-        this->buf.clear ();
+        this->buf = NULL;
+        this->cur_ptr = NULL;
+        this->max_size = 0;
+        this->used_size = 0;
         return true;
     }
 
-    bool write (const kdu_byte* buf, int num_bytes)
+    bool write (const kdu_byte* ptr, int sz)
     {
-        std::copy (buf, buf + num_bytes, std::back_inserter (this->buf));
-        return true;
+        size_t needed_size = (size_t) (this->cur_ptr - this->buf) + sz; //needed size
+        if (needed_size > this->max_size) {
+            throw std::range_error("Buffer size exceeded");
+        }
+
+        // copy bytes into buffer and adjust cur_ptr
+        memcpy (this->cur_ptr, ptr, sz);
+        this->cur_ptr += sz;
+        used_size = needed_size;
+
+        return sz;
     }
 
-    void set_target_size (kdu_long num_bytes) { this->buf.reserve (num_bytes); }
+    void set_target_size (kdu_long num_bytes) {
+        if (num_bytes > this->max_size) {
+            throw std::range_error("Buffer size exceeded");
+        }
+    }
 
     bool prefer_large_writes () const { return false; }
 
-    std::vector<uint8_t>& get_buffer () { return this->buf; }
+    uint8_t* get_buffer () { return this->buf; }
+
+    size_t get_size () { return this->used_size; }
 
 private:
-    std::vector<uint8_t> buf;
+    uint8_t* buf;
+    size_t max_size;
+    size_t used_size;
+    uint8_t* cur_ptr;
 };
 
 class error_message_handler : public kdu_core::kdu_message
@@ -170,59 +196,54 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
     siz.set (Nsigned, 0, 0, true);
     static_cast<kdu_params&> (siz).finalize ();
 
-    kdu_codestream        codestream;
-    mem_compressed_target output;
-    codestream.create (&siz, &output);
-
-    codestream.set_disabled_auto_comments (0xFFFFFFFF);
-
-    kdu_params* cod = codestream.access_siz ()->access_cluster (COD_params);
-
-    cod->set (Creversible, 0, 0, true);
-    cod->set (Corder, 0, 0, Corder_RPCL);
-    cod->set (Cmodes, 0, 0, Cmodes_HT);
-    cod->set (Cblk, 0, 0, 32);
-    cod->set (Cblk, 0, 1, 128);
-    cod->set (Clevels, 0, 0, 5);
-    cod->set (Cycc, 0, 0, isRGB);
-
-    kdu_params* nlt = codestream.access_siz ()->access_cluster (NLT_params);
-
-    nlt->set (NLType, 0, 0, NLType_SMAG);
-
-    codestream.access_siz ()->finalize_all ();
-
-    kdu_stripe_compressor compressor;
-    compressor.start (codestream);
-
-    compressor.push_stripe (
-        (kdu_int16*) encode->packed_buffer,
-        heights.data (),
-        sample_offsets.data (),
-        NULL,
-        row_gaps.data ());
-
-    compressor.finish ();
-
-    codestream.destroy ();
-
     size_t header_sz = write_header (
         (uint8_t*) encode->compressed_buffer,
         encode->packed_bytes,
-        cs_to_file_ch);
+        cs_to_file_ch
+    );
 
-    int compressed_sz = static_cast<size_t> (output.get_buffer ().size ());
+    kdu_codestream        codestream;
+    mem_compressed_target output(((uint8_t*) encode->compressed_buffer) + header_sz, encode->packed_bytes - header_sz);
 
-    if (compressed_sz + header_sz < encode->packed_bytes)
-    {
-        memcpy (
-            ((uint8_t*) encode->compressed_buffer) + header_sz,
-            output.get_buffer ().data (),
-            compressed_sz);
-        encode->compressed_bytes = compressed_sz + header_sz;
-    }
-    else
-    {
+    try {
+
+        codestream.create (&siz, &output);
+
+        codestream.set_disabled_auto_comments (0xFFFFFFFF);
+
+        kdu_params* cod = codestream.access_siz ()->access_cluster (COD_params);
+
+        cod->set (Creversible, 0, 0, true);
+        cod->set (Corder, 0, 0, Corder_RPCL);
+        cod->set (Cmodes, 0, 0, Cmodes_HT);
+        cod->set (Cblk, 0, 0, 32);
+        cod->set (Cblk, 0, 1, 128);
+        cod->set (Clevels, 0, 0, 5);
+        cod->set (Cycc, 0, 0, isRGB);
+
+        kdu_params* nlt = codestream.access_siz ()->access_cluster (NLT_params);
+
+        nlt->set (NLType, 0, 0, NLType_SMAG);
+
+        codestream.access_siz ()->finalize_all ();
+
+        kdu_stripe_compressor compressor;
+        compressor.start (codestream);
+
+        compressor.push_stripe (
+            (kdu_int16*) encode->packed_buffer,
+            heights.data (),
+            sample_offsets.data (),
+            NULL,
+            row_gaps.data ());
+
+        compressor.finish ();
+
+        codestream.destroy ();
+
+        encode->compressed_bytes = output.get_size () + header_sz;      
+        
+    } catch (const std::range_error& e) {
         encode->compressed_bytes = encode->packed_bytes;
     }
 
