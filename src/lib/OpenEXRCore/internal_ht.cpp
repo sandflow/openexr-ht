@@ -150,7 +150,14 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
     int width  = encode->chunk.width;
 
     std::vector<int> heights (encode->channel_count);
+    std::fill (heights.begin (), heights.end (), height);
+
     std::vector<int> sample_offsets (encode->channel_count);
+    for (int i = 0; i < sample_offsets.size (); i++)
+    {
+        sample_offsets[i] = cs_to_file_ch[i].file_index * width;
+    }
+
     std::vector<int> row_gaps (encode->channel_count);
     std::fill (
         row_gaps.begin (), row_gaps.end (), width * encode->channel_count);
@@ -164,9 +171,6 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
     static_cast<kdu_params&> (siz).finalize ();
 
     kdu_codestream        codestream;
-    // kdu_simple_file_target output("/tmp/out.j2c");
-    // codestream.create (&siz, &output);
-
     mem_compressed_target output;
     codestream.create (&siz, &output);
 
@@ -191,7 +195,6 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
     kdu_stripe_compressor compressor;
     compressor.start (codestream);
 
-    std::fill (heights.begin (), heights.end (), height);
     compressor.push_stripe (
         (kdu_int16*) encode->packed_buffer,
         heights.data (),
