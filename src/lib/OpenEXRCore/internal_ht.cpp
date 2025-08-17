@@ -14,6 +14,14 @@
 #include <ojph_codestream.h>
 #include <ojph_message.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include "internal_memory.h"
+#ifdef __cplusplus
+}
+#endif
+
 #include "openexr_decode.h"
 #include "openexr_encode.h"
 #include "internal_ht_common.h"
@@ -157,6 +165,17 @@ class staticmem_outfile : public ojph::outfile_base
     ojph::ui8 *cur_ptr;
   };
 
+void* alloc_fn (exr_transcoding_pipeline_buffer_id_t buf, size_t sz) {
+    return internal_exr_alloc(sz);
+}
+
+void
+free_fn (exr_transcoding_pipeline_buffer_id_t id, void* buf)
+{
+    if (id == EXR_TRANSCODE_BUFFER_SCRATCH1) { delete (ojph::codestream*) buf; }
+    else { internal_exr_free (buf); }
+}
+
 extern "C" exr_result_t
 internal_exr_undo_ht (
     exr_decode_pipeline_t* decode,
@@ -196,11 +215,19 @@ internal_exr_undo_ht (
         reinterpret_cast<const ojph::ui8*> (compressed_data) + header_sz,
         comp_buf_size - header_sz);
 
-    ojph::codestream cs;
-    cs.read_headers (&infile);
+    if (decode->scratch_buffer_1 == NULL) {
+        decode->alloc_fn = alloc_fn;
+        decode->free_fn = free_fn;
+        decode->scratch_buffer_1 = new ojph::codestream();
+    } else {
+        ((ojph::codestream*) decode->scratch_buffer_1)->restart();
+    }
+    ojph::codestream* cs = (ojph::codestream*)decode->scratch_buffer_1;
 
-    ojph::param_siz siz = cs.access_siz ();
-    ojph::param_nlt nlt = cs.access_nlt ();
+    cs->read_headers (&infile);
+
+    ojph::param_siz siz = cs->access_siz ();
+    ojph::param_nlt nlt = cs->access_nlt ();
 
     ojph::ui32 image_width =
         siz.get_image_extent ().x - siz.get_image_offset ().x;
@@ -217,19 +244,19 @@ internal_exr_undo_ht (
             decode->channels[c].y_samples > 1)
         { is_planar = true; }
     }
-    cs.set_planar (is_planar);
+    cs->set_planar (is_planar);
 
     assert (decode->chunk.width == image_width);
     assert (decode->chunk.height == image_height);
     assert (decode->channel_count == siz.get_num_components ());
 
-    cs.create ();
+    cs->create ();
 
     assert (sizeof (uint16_t) == 2);
     assert (sizeof (uint32_t) == 4);
     ojph::ui32      next_comp = 0;
     ojph::line_buf* cur_line;
-    if (cs.is_planar ())
+    if (cs->is_planar ())
     {
         for (uint32_t c = 0; c < decode->channel_count; c++)
         {
@@ -253,7 +280,7 @@ internal_exr_undo_ht (
 
                     if (line_c == file_c)
                     {
-                        cur_line = cs.pull (next_comp);
+                        cur_line = cs->pull (next_comp);
                         assert (next_comp == c);
 
                         if (decode->channels[file_c].data_type ==
@@ -296,7 +323,7 @@ internal_exr_undo_ht (
             for (uint32_t c = 0; c < decode->channel_count; c++)
             {
                 int file_c = cs_to_file_ch[c].file_index;
-                cur_line   = cs.pull (next_comp);
+                cur_line   = cs->pull (next_comp);
                 assert (next_comp == c);
                 if (decode->channels[file_c].data_type == EXR_PIXEL_HALF)
                 {
@@ -380,8 +407,8 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
 
     cod.set_color_transform (isRGB && !isPlanar);
     cod.set_reversible (true);
-    cod.set_block_dims (128, 32);
-    cod.set_num_decomposition (5);
+    cod.set_block_dims (256, 16);
+    cod.set_num_decomposition (4);
 
     try
     {
