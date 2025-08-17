@@ -367,10 +367,17 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
     int image_height = encode->chunk.height;
     int image_width  = encode->chunk.width;
 
-    ojph::codestream cs;
+    if (encode->scratch_buffer_1 == NULL) {
+        encode->alloc_fn = alloc_fn;
+        encode->free_fn = free_fn;
+        encode->scratch_buffer_1 = new ojph::codestream();
+    } else {
+        ((ojph::codestream*) encode->scratch_buffer_1)->restart();
+    }
+    ojph::codestream* cs = (ojph::codestream*)encode->scratch_buffer_1;
 
-    ojph::param_siz siz = cs.access_siz ();
-    ojph::param_nlt nlt = cs.access_nlt ();
+    ojph::param_siz siz = cs->access_siz ();
+    ojph::param_nlt nlt = cs->access_nlt ();
 
     bool isPlanar = false;
     siz.set_num_components (encode->channel_count);
@@ -398,12 +405,12 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
                encode->channels[file_c].width;
     }
 
-    cs.set_planar (isPlanar);
+    cs->set_planar (isPlanar);
 
     siz.set_image_offset (ojph::point (0, 0));
     siz.set_image_extent (ojph::point (image_width, image_height));
 
-    ojph::param_cod cod = cs.access_cod ();
+    ojph::param_cod cod = cs->access_cod ();
 
     cod.set_color_transform (isRGB && !isPlanar);
     cod.set_reversible (true);
@@ -422,12 +429,12 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
         staticmem_outfile output;
         output.open ( ((uint8_t*) encode->compressed_buffer) + header_sz, encode->packed_bytes - header_sz);
 
-        cs.write_headers (&output);
+        cs->write_headers (&output);
 
         ojph::ui32      next_comp = 0;
-        ojph::line_buf* cur_line  = cs.exchange (NULL, next_comp);
+        ojph::line_buf* cur_line  = cs->exchange (NULL, next_comp);
 
-        if (cs.is_planar ())
+        if (cs->is_planar ())
         {
             for (ojph::ui32 c = 0; c < encode->channel_count; c++)
             {
@@ -472,7 +479,7 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
                             }
 
                             assert (next_comp == c);
-                            cur_line = cs.exchange (cur_line, next_comp);
+                            cur_line = cs->exchange (cur_line, next_comp);
                         }
 
                         line_pixels += encode->channels[line_c].bytes_per_element *
@@ -515,13 +522,13 @@ internal_exr_apply_ht (exr_encode_pipeline_t* encode)
                         }
                     }
                     assert (next_comp == c);
-                    cur_line = cs.exchange (cur_line, next_comp);
+                    cur_line = cs->exchange (cur_line, next_comp);
                 }
                 line_pixels += bpl;
             }
         }
 
-        cs.flush ();
+        cs->flush ();
 
         assert (output.get_size () >= 0);
         encode->compressed_bytes = output.get_size () + header_sz;
