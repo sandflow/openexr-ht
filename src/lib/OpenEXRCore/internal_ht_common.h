@@ -12,8 +12,8 @@
 
 struct CodestreamChannelInfo
 {
-    int    file_index;
-    size_t raster_line_offset;
+    int16_t   file_index;
+    size_t    raster_line_offset;
 };
 
 bool make_channel_map (
