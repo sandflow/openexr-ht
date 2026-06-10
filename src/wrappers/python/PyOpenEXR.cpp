@@ -31,6 +31,7 @@
 #include "ImfDeepTiledInputPart.h"
 #include "ImfDeepFrameBuffer.h"
 #include "ImfPartType.h"
+#include "ImfThreading.h"
 #include "ImfArray.h"
 
 #include <cstring>
@@ -58,6 +59,7 @@
 #include "ImfTileDescriptionAttribute.h"
 #include "ImfTimeCodeAttribute.h"
 #include "ImfVecAttribute.h"
+#include "ImfIDManifestAttribute.h"
 
 #include <algorithm>
 #include <typeinfo>
@@ -293,8 +295,9 @@ PythonBinaryOStream::seekp(uint64_t pos)
     _fo.attr("seek")(pyLongFromUint64(pos), pyLongFromLong(0));
 }
 
-PyFile::PyFile()
-    : _header_only(false)
+PyFile::PyFile(int num_threads)
+    : _header_only(false),
+      _num_threads(num_threads < 0 ? globalThreadCount() : num_threads)
 {
 }
 
@@ -303,9 +306,10 @@ PyFile::PyFile()
 // Create a PyFile out of a list of parts (i.e. a multi-part file)
 //
 
-PyFile::PyFile(const py::list& parts)
+PyFile::PyFile(const py::list& parts, int num_threads)
     : parts(parts),
-      _header_only(false)
+      _header_only(false),
+      _num_threads(num_threads < 0 ? globalThreadCount() : num_threads)
 {
     int part_index = 0;
     for (auto p : this->parts)
@@ -323,8 +327,10 @@ PyFile::PyFile(const py::list& parts)
 // type, and compression (i.e. a single-part file)
 //
 
-PyFile::PyFile(const py::dict& header, const py::dict& channels)
-    : _header_only(false)
+PyFile::PyFile(const py::dict& header, const py::dict& channels,
+               int num_threads)
+    : _header_only(false),
+      _num_threads(num_threads < 0 ? globalThreadCount() : num_threads)
 {
     parts.append(py::cast<PyPart>(PyPart(header, channels, "")));
 }
@@ -346,16 +352,21 @@ PyFile::PyFile(const py::dict& header, const py::dict& channels)
 // e.g. "left.R", "left.G", etc, the channel key is the prefix.
 //
 
-PyFile::PyFile(const std::string& filename, bool separate_channels, bool header_only)
+PyFile::PyFile(const std::string& filename, bool separate_channels,
+               bool header_only, int num_threads)
     : filename(filename),
       _header_only(header_only),
-      _inputFile(std::make_unique<MultiPartInputFile>(filename.c_str()))
+      _num_threads(num_threads < 0 ? globalThreadCount() : num_threads),
+      _inputFile(std::make_unique<MultiPartInputFile>(filename.c_str(), _num_threads))
 {
     readPartsFromOpenInput(separate_channels);
 }
 
-PyFile::PyFile(py::object binary_stream, bool separate_channels, bool header_only)
-    : filename("<buffer>"), _header_only(header_only)
+PyFile::PyFile(py::object binary_stream, bool separate_channels, 
+               bool header_only, int num_threads)
+    : filename("<buffer>"),
+      _header_only(header_only),
+      _num_threads(num_threads < 0 ? globalThreadCount() : num_threads)
 {
     if (py::isinstance<py::str>(binary_stream))
     {
@@ -365,7 +376,7 @@ PyFile::PyFile(py::object binary_stream, bool separate_channels, bool header_onl
     }
 
     _readStream = std::make_unique<PythonBinaryIStream>(std::move(binary_stream));
-    _inputFile  = std::make_unique<MultiPartInputFile>(*_readStream);
+    _inputFile  = std::make_unique<MultiPartInputFile>(*_readStream, _num_threads);
     readPartsFromOpenInput(separate_channels);
 }
 
@@ -1225,17 +1236,26 @@ PyFile::__enter__()
 void
 PyFile::__exit__(py::args args)
 {
-    for (auto p : parts)
+    //
+    // Only clear part dicts when this File was populated by reading from
+    // disk. Constructors that take caller-owned header/channels dicts or
+    // a list of PyPart objects alias those Python objects; clearing here
+    // would mutate or empty the caller's dicts (see PyPart ctor).
+    //
+    if (_inputFile)
     {
-        PyPart& P = p.cast<PyPart&>();
-        P.header.clear();
-
-        for (auto c : P.channels)
+        for (auto p : parts)
         {
-            auto C = py::cast<PyChannel&>(c.second);
-            C.pixels = py::none();
+            PyPart& P = p.cast<PyPart&>();
+            P.header.clear();
+
+            for (auto c : P.channels)
+            {
+                auto C = py::cast<PyChannel&>(c.second);
+                C.pixels = py::none();
+            }
+            P.channels.clear();
         }
-        P.channels.clear();
     }
     parts = py::list();
 }
@@ -1543,7 +1563,8 @@ void
 PyFile::write(const char* outfilename)
 {
     std::vector<Header> headers = buildOutputHeaders();
-    MultiPartOutputFile outfile(outfilename, headers.data(), headers.size());
+    MultiPartOutputFile outfile (
+        outfilename, headers.data (), headers.size (), false, _num_threads);
     runMultiPartOutput(outfile, headers);
     filename = outfilename;
 }
@@ -1560,7 +1581,8 @@ PyFile::write(py::object binary_stream)
     
     std::vector<Header> headers = buildOutputHeaders();
     PythonBinaryOStream pstream(std::move(binary_stream));
-    MultiPartOutputFile outfile(pstream, headers.data(), headers.size());
+    MultiPartOutputFile outfile (
+        pstream, headers.data (), headers.size (), false, _num_threads);
     runMultiPartOutput(outfile, headers);
 
     filename = "<buffer>";
@@ -1888,6 +1910,13 @@ PyFile::getAttributeObject(const std::string& name, const Attribute* a)
     
     if (auto v = dynamic_cast<const V3dAttribute*> (a))
         return make_v3(v->value());
+    
+    if (auto v = dynamic_cast<const IDManifestAttribute*> (a))
+    {
+        const CompressedIDManifest& cmpd = v->value();
+        IDManifest decoded = IDManifest(cmpd);
+        return py::cast(decoded);
+    }
 
     std::stringstream err;
     err << "unsupported attribute type: " << a->typeName();
@@ -1895,7 +1924,22 @@ PyFile::getAttributeObject(const std::string& name, const Attribute* a)
     
     return py::none();
 }
-    
+
+// Static helper functions to cache NumPy types and avoid repeated imports
+py::object
+numpy_integer ()
+{
+    static py::object type = py::module::import ("numpy").attr ("integer");
+    return type;
+}
+
+py::object
+numpy_floating ()
+{
+    static py::object type = py::module::import ("numpy").attr ("floating");
+    return type;
+}
+
 template <class P, class T>
 bool
 objectToV2(const py::object& object, Vec2<T>& v)
@@ -1903,13 +1947,42 @@ objectToV2(const py::object& object, Vec2<T>& v)
     if (py::isinstance<py::tuple>(object))
     {
         auto tup = object.cast<py::tuple>();
-        if (tup.size() == 2 &&
-            py::isinstance<P>(tup[0]) &&
-            py::isinstance<P>(tup[1]))
-        {       
-            v.x = P(tup[0]);
-            v.y = P(tup[1]);
-            return true;
+        if (tup.size() == 2)
+        {
+            // 1. Standard Python types only
+            if (py::isinstance<P> (tup[0]) && py::isinstance<P> (tup[1]))
+            {
+                v.x = P (tup[0]);
+                v.y = P (tup[1]);
+                return true;
+            }
+
+            // 2. Numpy scalar types included
+
+            // Assigning numpy equivalent to Python type P passed from the calling function
+            // objectToV2 is currently instantiated only with py::int_ and py::float_, so the ternary
+            // maps directly to numpy.integer / numpy.floating.
+            py::object target_type = std::is_same_v<P, py::int_>
+                                         ? numpy_integer ()
+                                         : numpy_floating ();
+
+            // Allowing tuples that contain numpy scalars
+            if ((py::isinstance<P> (tup[0]) ||
+                 py::isinstance (tup[0], target_type)) &&
+                (py::isinstance<P> (tup[1]) ||
+                 py::isinstance (tup[1], target_type)))
+            {
+                try
+                {
+                    v.x = py::cast<T> (tup[0]);
+                    v.y = py::cast<T> (tup[1]);
+                    return true;
+                }
+                catch (const py::cast_error&)
+                {
+                    return false;
+                }
+            }
         }
     }
     else if (py::isinstance<py::array_t<T>>(object))
@@ -2419,6 +2492,11 @@ PyFile::insertAttribute(Header& header, const std::string& name, const py::objec
         Rational r(n, d);
         header.insert(name, RationalAttribute(r));
     }
+    else if (py::isinstance<IDManifest>(object))
+    {
+        const IDManifest& m = object.cast<IDManifest>();
+        header.insert(name, IDManifestAttribute(CompressedIDManifest(m)));
+    }
     else
     {
         auto t = py::str(object.attr("__class__").attr("__name__"));
@@ -2689,14 +2767,90 @@ operator==(const Imf::OpaqueAttribute& a,const Imf::OpaqueAttribute& b)
 }
 OPENEXR_IMF_INTERNAL_NAMESPACE_HEADER_EXIT
 
+namespace
+{
+    // Python iteration glue: C++ uses separate begin/end ConstIterators, not operator*.
+    struct ChannelGroupIterator
+    {
+        const IDManifest::ChannelGroupManifest* group;
+        IDManifest::ChannelGroupManifest::ConstIterator cur, end;
+
+        ChannelGroupIterator (const IDManifest::ChannelGroupManifest& g)
+            : group (&g), cur (g.begin ()), end (g.end ())
+        {}
+    };
+
+}
+
 PYBIND11_MODULE(OpenEXR, m)
 {
     using namespace py::literals;
+    using ConstIterator = IDManifest::ChannelGroupManifest::ConstIterator; 
+    using Iterator = IDManifest::ChannelGroupManifest::Iterator;
 
     m.doc() = "Read and write EXR high-dynamic range image files";
     
     m.attr("__version__") = OPENEXR_VERSION_STRING;
     m.attr("OPENEXR_VERSION") = OPENEXR_VERSION_STRING;
+
+    m.def(
+        "set_global_thread_count",
+        &setGlobalThreadCount,
+        py::arg("count"),
+        "Set the number of worker threads in OpenEXR's **process-wide** "
+        "thread pool used for parallel I/O and compression/decompression.\n\n"
+        "``count`` may be any non-negative integer; ``0`` selects single-threaded "
+        "operation. For parallel decode when opening files "
+        "with ``num_threads`` > 1, the global pool must typically be non-zero. "
+        "This setting is shared by all OpenEXR I/O in the process. "
+        "Call this once at startup before reading/writing large images.\n\n");
+
+    m.def(
+        "global_thread_count",
+        &globalThreadCount,
+        "Return the current number of worker threads in OpenEXR's global pool.\n\n");
+
+    m.def(
+        "setMaxImageSize",
+        &Header::setMaxImageSize,
+        py::arg("max_width"),
+        py::arg("max_height"),
+        "Set the maximum allowed image width and height for subsequent OpenEXR reads "
+        "and writes in this process.\n\n"
+        "Pass ``0`` for either dimension to mean no limit for that dimension. "
+        "Maps to ``Imf::Header::setMaxImageSize()``.\n\n");
+
+    m.def(
+        "getMaxImageSize",
+        [](){
+            int w = 0;
+            int h = 0;
+            Header::getMaxImageSize (w, h);
+            return py::make_tuple (w, h);
+        },
+        "Return ``(max_width, max_height)`` for the current image dimension limits.\n\n"
+        "Maps to ``Imf::Header::getMaxImageSize()``.\n\n");
+
+    m.def(
+        "setMaxTileSize",
+        &Header::setMaxTileSize,
+        py::arg("max_width"),
+        py::arg("max_height"),
+        "Set the maximum allowed tile width and height for subsequent OpenEXR reads "
+        "and writes in this process.\n\n"
+        "Pass ``0`` for either dimension to mean no limit for that dimension. "
+        "Maps to ``Imf::Header::setMaxTileSize()``.\n\n");
+
+    m.def(
+        "getMaxTileSize",
+        [](){
+            int w = 0;
+            int h = 0;
+            Header::getMaxTileSize (w, h);
+            return py::make_tuple (w, h);
+        },
+        "Return ``(max_width, max_height)`` for the current tile dimension limits.\n\n"
+        "Maps to ``Imf::Header::getMaxTileSize()``.\n\n");
 
     //
     // Add symbols from the legacy implementation of the bindings for
@@ -2749,6 +2903,7 @@ PYBIND11_MODULE(OpenEXR, m)
         .value("DWAB_COMPRESSION", DWAB_COMPRESSION)
         .value("HTJ2K256_COMPRESSION", HTJ2K256_COMPRESSION)
         .value("HTJ2K32_COMPRESSION", HTJ2K32_COMPRESSION)
+        .value("HTJ2KL256_COMPRESSION", HTJ2KL256_COMPRESSION)
         .value("NUM_COMPRESSION_METHODS", NUM_COMPRESSION_METHODS)
         .export_values();
     
@@ -2909,6 +3064,150 @@ PYBIND11_MODULE(OpenEXR, m)
         .def_readwrite("pixels", &PyPreviewImage::pixels)
         ;
     
+    py::class_<ConstIterator>(m, "ChannelGroupManifestEntry")
+        .def("id", &ConstIterator::id, py::return_value_policy::copy)
+        .def("text", &ConstIterator::text, py::return_value_policy::copy);
+
+    py::class_<ChannelGroupIterator> (m, "ChannelGroupIterator", py::module_local ())
+        .def ("__iter__",
+              [] (ChannelGroupIterator& self) -> ChannelGroupIterator& { return self; })
+        .def ("__next__",
+              [] (ChannelGroupIterator& self) -> ConstIterator {
+                  if (self.cur == self.end)
+                    throw py::stop_iteration ();
+                  ConstIterator out = self.cur; 
+                  ++self.cur; 
+                  return out;
+              });
+
+    py::enum_<IDManifest::IdLifetime> (m, "IdLifetime")
+        .value ("LIFETIME_FRAME", IDManifest::LIFETIME_FRAME)
+        .value ("LIFETIME_SHOT", IDManifest::LIFETIME_SHOT)
+        .value ("LIFETIME_STABLE", IDManifest::LIFETIME_STABLE)
+        .export_values ();
+
+    m.attr ("ID_MANIFEST_NOTHASHED")     = IDManifest::NOTHASHED;
+    m.attr ("ID_MANIFEST_ID_SCHEME")     = IDManifest::ID_SCHEME;
+    m.attr ("ID_MANIFEST_ID2_SCHEME")    = IDManifest::ID2_SCHEME;
+    m.attr ("ID_MANIFEST_MURMURHASH3_32") = IDManifest::MURMURHASH3_32;
+    m.attr ("ID_MANIFEST_MURMURHASH3_64") = IDManifest::MURMURHASH3_64;
+
+    py::class_<Iterator> (m, "ChannelGroupManifestEntryIterator", py::module_local ())
+        .def ("id", &Iterator::id, py::return_value_policy::copy)
+        .def ("text", &Iterator::text, py::return_value_policy::copy);
+
+    py::class_<IDManifest::ChannelGroupManifest> (
+        m, "ChannelGroupManifest", "Channel group manifest for the image")
+        .def (py::init ())
+        .def ("getHashScheme", &IDManifest::ChannelGroupManifest::getHashScheme)
+        .def (
+            "getChannels",
+            [] (const IDManifest::ChannelGroupManifest& g) {
+                return g.getChannels ();
+            })
+        .def ("getEncodingScheme", &IDManifest::ChannelGroupManifest::getEncodingScheme)
+        .def ("getComponents", &IDManifest::ChannelGroupManifest::getComponents)
+        .def ("getLifetime", &IDManifest::ChannelGroupManifest::getLifetime)
+        .def ("setHashScheme", &IDManifest::ChannelGroupManifest::setHashScheme)
+        .def ("setEncodingScheme", &IDManifest::ChannelGroupManifest::setEncodingScheme)
+        .def ("setComponents", &IDManifest::ChannelGroupManifest::setComponents)
+        .def ("setComponent", &IDManifest::ChannelGroupManifest::setComponent)
+        .def ("setChannel", &IDManifest::ChannelGroupManifest::setChannel)
+        .def (
+            "setChannels",
+            [] (IDManifest::ChannelGroupManifest& g, py::iterable channels) {
+                std::set<std::string> s;
+                for (const py::handle item : channels)
+                    s.insert (item.cast<std::string> ());
+                g.setChannels (s);
+            })
+        .def (
+            "setLifetime",
+            py::overload_cast<const IDManifest::IdLifetime&> (
+                &IDManifest::ChannelGroupManifest::setLifetime))
+        .def (
+            "setLifetime",
+            [] (IDManifest::ChannelGroupManifest& g, int lifetime) {
+                if (lifetime < 0 || lifetime > 2)
+                    throw std::invalid_argument (
+                        "lifetime must be 0 (frame), 1 (shot), or 2 (stable)");
+                g.setLifetime (static_cast<IDManifest::IdLifetime> (lifetime));
+            })
+        .def (
+            "insert",
+            py::overload_cast<const std::string&> (
+                &IDManifest::ChannelGroupManifest::insert))
+        .def (
+            "insert",
+            py::overload_cast<const std::vector<std::string>&> (
+                &IDManifest::ChannelGroupManifest::insert))
+        .def (
+            "insert",
+            py::overload_cast<uint64_t, const std::string&> (
+                &IDManifest::ChannelGroupManifest::insert))
+        .def (
+            "insert",
+            py::overload_cast<uint64_t, const std::vector<std::string>&> (
+                &IDManifest::ChannelGroupManifest::insert))
+        .def (
+            "find",
+            py::overload_cast<uint64_t> (
+                &IDManifest::ChannelGroupManifest::find))
+        .def (
+            "find",
+            py::overload_cast<uint64_t> (
+                &IDManifest::ChannelGroupManifest::find, py::const_))
+        .def ("erase", &IDManifest::ChannelGroupManifest::erase)
+        .def ("size", &IDManifest::ChannelGroupManifest::size)
+        .def (
+            "__lshift__",
+            [] (IDManifest::ChannelGroupManifest& g, uint64_t id)
+                -> IDManifest::ChannelGroupManifest& {
+                g << id;
+                return g;
+            },
+            py::return_value_policy::reference_internal)
+        .def (
+            "__lshift__",
+            [] (IDManifest::ChannelGroupManifest& g, const std::string& text)
+                -> IDManifest::ChannelGroupManifest& {
+                g << text;
+                return g;
+            },
+            py::return_value_policy::reference_internal)
+        .def (
+            "__iter__",
+            [] (const IDManifest::ChannelGroupManifest& g) {
+                return ChannelGroupIterator (g);
+            },
+            py::keep_alive<0, 1> ());
+
+    py::class_<IDManifest> (m, "IDManifest", "ID manifest for the image")
+        .def (py::init<> ())
+        .def (py::init<const CompressedIDManifest&> ())
+        .def ("size", &IDManifest::size)
+        .def (
+            "__getitem__",
+            [] (IDManifest& self, size_t index)
+                -> IDManifest::ChannelGroupManifest& { return self[index]; },
+            py::return_value_policy::reference_internal)
+        .def (
+            "add",
+            [] (IDManifest& m, const IDManifest::ChannelGroupManifest& cgm)
+                -> IDManifest::ChannelGroupManifest& { return m.add (cgm); },
+            py::return_value_policy::reference_internal)
+        .def (
+            "add",
+            [] (IDManifest& m, const std::set<std::string>& group)
+                -> IDManifest::ChannelGroupManifest& { return m.add (group); },
+            py::return_value_policy::reference_internal)
+        .def (
+            "add",
+            [] (IDManifest& m, const std::string& ch)
+                -> IDManifest::ChannelGroupManifest& { return m.add (ch); },
+            py::return_value_policy::reference_internal)
+        .def ("find", &IDManifest::find)
+        .def ("merge", &IDManifest::merge);
     //
     // The File API: Channel, Part, and File
     //
@@ -3085,7 +3384,8 @@ PYBIND11_MODULE(OpenEXR, m)
              "    DWAA_COMPRESSION\n"
              "    DWAB_COMPRESSION\n"
              "    HTJ2K256_COMPRESSION\n"
-             "    HTJ2K32_COMPRESSION")
+             "    HTJ2K32_COMPRESSION\n"
+             "    HTJ2KL256_COMPRESSION")
         .def_readwrite("header", &PyPart::header,
              "dict : The header metadata.")
         .def_readwrite("channels", &PyPart::channels,
@@ -3105,11 +3405,20 @@ PYBIND11_MODULE(OpenEXR, m)
                                   ">>> f = OpenEXR.File(\"image.exr\")\n"
                                   ">>> f.header()[\"comment\"] = \"Hello, image.\"\n"
                                   ">>> f.write(\"out.exr\")")
-        .def(py::init<>())
-        .def(py::init<std::string,bool,bool>(),
+        .def(py::init<int>(),
+             py::arg("num_threads")=-1,
+             "Initialize an empy File.\n"
+             "\n"
+             "Parameters\n"
+             "----------\n"
+             "    Number of threads for multithreaded I/O and encode/decode of the File.\n"
+             "\n"
+             )
+        .def(py::init<std::string,bool,bool,int>(),
              py::arg("filename"),
              py::arg("separate_channels")=false,
              py::arg("header_only")=false,
+             py::arg("num_threads")=-1,
              "Initialize a File by reading the image from the given filename.\n"
              "\n"
              "Parameters\n"
@@ -3121,40 +3430,28 @@ PYBIND11_MODULE(OpenEXR, m)
              "    if False (default), read pixel data into a single \"RGB\" or \"RGBA\" numpy array of dimension (height,width,3) or (height,width,4);\n"
              "header_only : bool\n"
              "    If True, read only the header metadata, not the image pixel data.\n"
+             "num_threads : int\n"
+             "    Number of threads for multithreaded I/O and encode/decode of the File.\n"
              "\n"
              "Example\n"
              "-------  \n"
              ">>> f = OpenEXR.File(\"image.exr\", separate_channels=False, header_only=False)")
-        .def(py::init<py::dict,py::dict>(),
-             py::arg("header"),
-             py::arg("channels"),
-             "Initialize a File with metadata and pixels. Creates a single-part EXR file.\n"
-             "\n"
-             "Parameters\n"
-             "----------\n"
-             "header : dict\n"
-             "    Dict of header metadata, with attribute name as key.\n"
-             "channels : list\n"
-             "    List of `Channel` objects, which hold pixel numpy arrays.\n"
-             "\n"
-             "Example\n"
-             "-------\n"
-             ">>> height, width = (20, 10)\n"
-             ">>> R = np.random.rand(height, width).astype('f')\n"
-             ">>> G = np.random.rand(height, width).astype('f')\n"
-             ">>> B = np.random.rand(height, width).astype('f')\n"
-             ">>> channels = { \"R\" : R, \"G\" : G, \"B\" : B }\n"
-             ">>> header = { \"compression\" : OpenEXR.ZIP_COMPRESSION,\n"
-             "               \"type\" : OpenEXR.scanlineimage }\n"
-             ">>> f = OpenEXR.File(header, channels)")
-        .def(py::init<py::list>(),
+        //
+        // Single-arg py::object (binary stream) matches any Python object, so
+        // register list-of-parts BEFORE stream so File([Part, ...]) is not
+        // mistaken for File(BytesIO(...)).
+        //
+        .def(py::init<py::list,int>(),
              py::arg("parts"),
+             py::arg("num_threads")=-1,
              "Initialize a File with a list of Part objects.\n"
              "\n"
              "Parameters\n"
              "----------\n"
              "parts : list\n"
              "    List of Part objects\n"
+             "num_threads : int\n"
+             "    Number of threads for multithreaded I/O and encode/decode for this File.\n"
              "\n"
              "Example\n"
              "-------\n"
@@ -3164,10 +3461,11 @@ PYBIND11_MODULE(OpenEXR, m)
              ">>> P0 = OpenEXR.Part({}, {\"Z\" : Z0 })\n"
              ">>> P1 = OpenEXR.Part({}, {\"Z\" : Z1 })\n"
              ">>> f = OpenEXR.File([P0, P1])")
-        .def(py::init<py::object, bool, bool>(),
+        .def(py::init<py::object, bool, bool, int>(),
              py::arg("stream"),
              py::arg("separate_channels") = false,
              py::arg("header_only") = false,
+             py::arg("num_threads")=-1,
              "Initialize a File by reading from a binary stream.\n"
              "\n"
              "The stream must implement read(), tell(), and seek() and contain a\n"
@@ -3181,7 +3479,34 @@ PYBIND11_MODULE(OpenEXR, m)
              "separate_channels : bool\n"
              "    Same as for the filename constructor.\n"
              "header_only : bool\n"
-             "    Same as for the filename constructor.\n")
+             "    Same as for the filename constructor.\n"
+             "num_threads : int\n"
+             "    Number of threads for multithreaded I/O and encode/decode for this File.\n")
+        .def(py::init<py::dict,py::dict,int>(),
+             py::arg("header"),
+             py::arg("channels"),
+             py::arg("num_threads")=-1,
+             "Initialize a File with metadata and pixels. Creates a single-part EXR file.\n"
+             "\n"
+             "Parameters\n"
+             "----------\n"
+             "header : dict\n"
+             "    Dict of header metadata, with attribute name as key.\n"
+             "channels : list\n"
+             "    List of `Channel` objects, which hold pixel numpy arrays.\n"
+             "num_threads : int\n"
+             "    Number of threads for multithreaded I/O and encode/decode for this File.\n"
+             "\n"
+             "Example\n"
+             "-------\n"
+             ">>> height, width = (20, 10)\n"
+             ">>> R = np.random.rand(height, width).astype('f')\n"
+             ">>> G = np.random.rand(height, width).astype('f')\n"
+             ">>> B = np.random.rand(height, width).astype('f')\n"
+             ">>> channels = { \"R\" : R, \"G\" : G, \"B\" : B }\n"
+             ">>> header = { \"compression\" : OpenEXR.ZIP_COMPRESSION,\n"
+             "               \"type\" : OpenEXR.scanlineimage }\n"
+             ">>> f = OpenEXR.File(header, channels)")
         .def("__enter__", &PyFile::__enter__)
         .def("__exit__", &PyFile::__exit__)
         .def_readwrite("filename", &PyFile::filename,

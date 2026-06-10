@@ -16,6 +16,7 @@
 
 #include "openexr_decode.h"
 #include "openexr_encode.h"
+#include "openexr_part.h"
 #include "internal_ht_common.h"
 
 /**
@@ -172,8 +173,25 @@ ht_undo_impl (
     /* read the channel map */
 
     size_t header_sz;
-    header_sz = read_header (
-        (uint8_t*) compressed_data, comp_buf_size, cs_to_file_ch);
+    try
+    {
+        header_sz = read_header (
+            (uint8_t*) compressed_data, comp_buf_size, cs_to_file_ch);
+    }
+    catch (...)
+    {
+        return EXR_ERR_CORRUPT_CHUNK;
+    }
+
+    /* this should never be true since read_header() throws an exception if the
+    header is larger than comp_buf_size */
+    if (header_sz > comp_buf_size)
+        return EXR_ERR_CORRUPT_CHUNK;
+
+    const uint64_t codestream_sz = comp_buf_size - header_sz;
+    if (codestream_sz == 0)
+        return EXR_ERR_CORRUPT_CHUNK;
+
     if (static_cast<std::size_t>(decode->channel_count) != cs_to_file_ch.size ())
         return EXR_ERR_CORRUPT_CHUNK;
 
@@ -195,7 +213,7 @@ ht_undo_impl (
     ojph::mem_infile infile;
     infile.open (
         reinterpret_cast<const ojph::ui8*> (compressed_data) + header_sz,
-        comp_buf_size - header_sz);
+        codestream_sz);
 
     ojph::codestream cs;
     cs.read_headers (&infile);
@@ -280,12 +298,12 @@ ht_undo_impl (
                         }
                         else
                         {
-                            int32_t* channel_pixels = (int32_t*) line_pixels;
+                            uint32_t* channel_pixels = (uint32_t*) line_pixels;
                             for (int32_t p = 0;
                                  p < decode->channels[file_c].width;
                                  p++)
                             {
-                                *channel_pixels++ = cur_line->i32[p];
+                                *channel_pixels++ = (uint32_t) cur_line->i32[p];
                             }
                         }
                     }
@@ -321,12 +339,12 @@ ht_undo_impl (
                 }
                 else
                 {
-                    int32_t* channel_pixels =
-                        (int32_t*) (line_pixels + cs_to_file_ch[c].raster_line_offset);
+                    uint32_t* channel_pixels =
+                        (uint32_t*) (line_pixels + cs_to_file_ch[c].raster_line_offset);
                     for (int32_t p = 0; p < decode->channels[file_c].width;
                          p++)
                     {
-                        *channel_pixels++ = cur_line->i32[p];
+                        *channel_pixels++ = (uint32_t) cur_line->i32[p];
                     }
                 }
             }
@@ -412,12 +430,29 @@ ht_apply_impl (exr_encode_pipeline_t* encode)
     siz.set_image_offset (ojph::point (0, 0));
     siz.set_image_extent (ojph::point (image_width, image_height));
 
+    exr_compression_t comp = EXR_COMPRESSION_HTJ2K256;
+    exr_get_compression (encode->context, encode->part_index, &comp);
+    bool lossy = (comp == EXR_COMPRESSION_HTJ2KL256);
+
     ojph::param_cod cod = cs.access_cod ();
 
     cod.set_color_transform (isRGB && !isPlanar);
-    cod.set_reversible (true);
+    cod.set_reversible (!lossy);
     cod.set_block_dims (128, 32);
     cod.set_num_decomposition (5);
+
+    if (lossy)
+    {
+        float lossy_htj2k_quality = -1.f;
+        exr_get_lossy_htj2k_quality (
+            encode->context, encode->part_index, &lossy_htj2k_quality);
+        if (lossy_htj2k_quality <= 0.f) {
+            return EXR_ERR_INVALID_ARGUMENT;
+        }
+
+        ojph::param_qcd qcd = cs.access_qcd ();
+        qcd.set_irrev_quant (lossy_htj2k_quality);
+    }
 
     try
     {
