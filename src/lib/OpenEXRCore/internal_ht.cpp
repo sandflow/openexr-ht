@@ -454,10 +454,11 @@ ht_apply_impl (exr_encode_pipeline_t* encode)
         for (int16_t c = 0; c < 3; c++)
         {
             int file_c = cs_channel_info[c].file_index;
-            lossy      = cs_channel_info[c].kind == J2KChannelKind::visual &&
-                            encode->channels[file_c].data_type != EXR_PIXEL_UINT &&
-                            encode->channels[file_c].x_samples == 1 &&
-                            encode->channels[file_c].y_samples == 1;
+            lossy      = lossy &&
+                         cs_channel_info[c].kind == J2KChannelKind::visual &&
+                         encode->channels[file_c].data_type != EXR_PIXEL_UINT &&
+                         encode->channels[file_c].x_samples == 1 &&
+                         encode->channels[file_c].y_samples == 1;
         }
     }
 
@@ -498,7 +499,7 @@ ht_apply_impl (exr_encode_pipeline_t* encode)
             /* Cb */
             qcd.set_irrev_quant (1, delta_ref / sqrt(3.2584/3.));
             /* Cr */
-            qcd.set_irrev_quant (1, delta_ref / sqrt(2.4756/3.));
+            qcd.set_irrev_quant (2, delta_ref / sqrt(2.4756/3.));
 
         }
 
